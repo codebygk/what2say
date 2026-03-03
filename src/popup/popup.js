@@ -74,7 +74,7 @@ saveBtn.addEventListener("click", async () => {
     charLimit: Number(charLimit.value),
     persona: personaInput.value.trim(),
   });
-  showConfirm("Settings saved ✓");
+  showConfirm("Settings saved");
 });
 
 resetBtn.addEventListener("click", async () => {

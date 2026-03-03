@@ -1,95 +1,47 @@
-// ─────────────────────────────────────────────
-//  Service Worker — the extension's brain.
-//  Registers the context menu, listens for clicks,
-//  orchestrates the pipeline, writes to clipboard.
-//
-//  Flow:
-//    User selects text → right-click → "Generate Comment"
-//    → buildCommentPrompt() → ollamaChat() → clipboard → notify
-// ─────────────────────────────────────────────
-import {
-  clearNotification,
-  notifyError,
-  notifySuccess,
-  showGeneratingNotification,
-} from "./notifier.js";
-import { listLocalModels, ollamaChat } from "./ollama-client.js";
-import { CONTEXT_MENU, MESSAGES, TONES } from "/src/shared/constants.js";
-import { loadSettings } from "/src/shared/storage.js";
+import { DEFAULT_SETTINGS, TONES } from "../shared/constants.js";
 
-// ── Setup ─────────────────────────────────────
+const OLLAMA_BASE_URL   = "http://localhost:11434";
+const OLLAMA_ENDPOINT   = "/api/chat";
+const OLLAMA_TIMEOUT_MS = 60_000;
+const GENERATE_MENU_ID  = "ai-commenter-generate";
+const NOTIF_ID          = "ai-commenter-main";
 
-chrome.runtime.onInstalled.addListener(() => {
-  registerContextMenu();
-});
-
-// Re-register on browser startup (service workers can be killed)
-chrome.runtime.onStartup.addListener(() => {
-  registerContextMenu();
-});
-
-// ── Context Menu ──────────────────────────────
+chrome.runtime.onInstalled.addListener(registerContextMenu);
+chrome.runtime.onStartup.addListener(registerContextMenu);
 
 function registerContextMenu() {
-  // Clear any stale menus first (safe to call on install)
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
-      id: CONTEXT_MENU.GENERATE_ID,
+      id: GENERATE_MENU_ID,
       title: "Generate Comment",
-      contexts: ["selection"], // Only shows up when text is selected
+      contexts: ["selection"],
     });
   });
 }
 
-// ── Context Menu Click Handler ────────────────
-
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== CONTEXT_MENU.GENERATE_ID) return;
-
-  const selectedText = info.selectionText?.trim();
-  if (!selectedText) {
-    notifyError("No text selected. Select the post text and try again.");
-    return;
-  }
-
-  await generateAndCopy(selectedText);
+chrome.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId !== GENERATE_MENU_ID) return;
+  const text = info.selectionText?.trim();
+  if (!text) { notifyError("No text selected."); return; }
+  generateAndCopy(text);
 });
 
-// ── Message Handler (called from popup) ───────
-// Allows the popup to trigger generation or fetch model list.
-
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === MESSAGES.GENERATE_COMMENT) {
-    generateAndCopy(message.postText).then(() => sendResponse({ ok: true }));
-    return true; // Keep channel open for async response
-  }
-
   if (message.type === "LIST_MODELS") {
     listLocalModels().then((models) => sendResponse({ models }));
     return true;
   }
 });
 
-// ── Core Pipeline ─────────────────────────────
-
-/**
- * Full pipeline: selected text → Ollama → clipboard → notification.
- * All errors are caught and surfaced as notifications so the user
- * always gets feedback regardless of what went wrong.
- *
- * @param {string} postText
- */
 async function generateAndCopy(postText) {
   const settings = await loadSettings();
-
-  // Show "generating" notification immediately on click
   showGeneratingNotification();
-  await new Promise((resolve) => setTimeout(resolve, 100)); // give Chrome time to render the notification
+  await sleep(150);
 
   const messages = buildPrompt({
     postText,
-    tone: settings.tone,
-    persona: settings.persona,
+    tone:      settings.tone,
+    persona:   settings.persona,
     charLimit: settings.charLimit,
   });
 
@@ -97,8 +49,7 @@ async function generateAndCopy(postText) {
   try {
     comment = await ollamaChat(messages, settings.model);
   } catch (err) {
-    console.error("[AI Commenter]", err);
-    clearNotification();
+    console.error("[Way2Say] Ollama error:", err);
     notifyError(err.message);
     return;
   }
@@ -106,43 +57,90 @@ async function generateAndCopy(postText) {
   try {
     await writeToClipboard(comment);
   } catch (err) {
-    clearNotification();
+    console.error("[Way2Say] Clipboard error:", err);
     notifyError("Clipboard write failed: " + err.message);
     return;
   }
 
-  clearNotification();
   notifySuccess(comment);
 }
 
-// ── Clipboard Helper ──────────────────────────
-// Service workers don't have direct clipboard access.
-// We inject a tiny one-off script into the active tab to do it.
+async function ollamaChat(messages, model) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(OLLAMA_BASE_URL + OLLAMA_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({ model, messages, stream: false }),
+    });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") throw new Error("Ollama timed out after 60s. Try gemma2:2b for faster responses.");
+    throw new Error("Cannot reach Ollama. Run: OLLAMA_ORIGINS=* ollama serve");
+  }
+  clearTimeout(timer);
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error("Ollama returned " + response.status + ": " + body);
+  }
+  let data;
+  try { data = await response.json(); }
+  catch { throw new Error("Ollama response was not valid JSON."); }
+  const content = data?.message?.content?.trim() ?? "";
+  if (!content) throw new Error("Ollama returned empty response. Is " + model + " pulled?");
+  return content;
+}
+
+async function listLocalModels() {
+  try {
+    const res = await fetch(OLLAMA_BASE_URL + "/api/tags", { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.models ?? []).map((m) => m.name);
+  } catch { return []; }
+}
 
 async function writeToClipboard(text) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found.");
+  const isSafeTab =
+    tab?.id && tab.url &&
+    !tab.url.startsWith("chrome://") &&
+    !tab.url.startsWith("chrome-extension://") &&
+    !tab.url.startsWith("edge://") &&
+    !tab.url.startsWith("about:");
 
-  const results = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: (textToCopy) => navigator.clipboard.writeText(textToCopy),
-    args: [text],
-  });
-
-  // executeScript throws on failure; surface any rejection
-  if (results?.[0]?.result instanceof Error) {
-    throw results[0].result;
+  if (isSafeTab) {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (t) => navigator.clipboard.writeText(t),
+      args: [text],
+    });
+    return;
   }
+  await copyViaOffscreen(text);
 }
 
-// ── Prompt Builder ────────────────────────────
+async function copyViaOffscreen(text) {
+  const hasDoc = await chrome.offscreen.hasDocument?.().catch(() => false);
+  if (!hasDoc) {
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: ["CLIPBOARD"],
+      justification: "Write generated comment to clipboard",
+    });
+  }
+  await chrome.runtime.sendMessage({ type: "COPY_TO_CLIPBOARD", text });
+  await chrome.offscreen.closeDocument().catch(() => {});
+}
+
 function buildPrompt({ postText, tone, persona, charLimit }) {
   const toneDesc = TONES[tone] ?? TONES.professional;
-  const personaLine =
-    persona && persona.trim()
-      ? "You are writing as: " + persona.trim() + "."
-      : "You are a thoughtful professional engaging with content online.";
-
+  const personaLine = persona && persona.trim()
+    ? "You are writing as: " + persona.trim() + "."
+    : "You are a thoughtful professional engaging with content online.";
   const system = [
     personaLine,
     "Write a single comment replying to the social media post below.",
@@ -150,15 +148,58 @@ function buildPrompt({ postText, tone, persona, charLimit }) {
     "Rules:",
     "  - Maximum " + charLimit + " characters.",
     "  - Output ONLY the comment text. No labels, no quotes, no preamble.",
-    "  - Never start with 'Great post!' or hollow openers.",
+    "  - Never start with Great post! or hollow openers.",
     "  - Be specific to the content.",
     "  - Sound human, not AI-generated.",
   ].join("\n");
-
-  const user = 'Post:\n"""\n' + postText + '\n"""\n\nWrite a comment:';
-
+  const user = 'Post:\n"""\n' + postText.trim() + '\n"""\n\nWrite a comment:';
   return [
     { role: "system", content: system },
     { role: "user", content: user },
   ];
+}
+
+function loadSettings() {
+  return new Promise((resolve) => chrome.storage.sync.get(DEFAULT_SETTINGS, resolve));
+}
+
+function showGeneratingNotification() {
+  chrome.notifications.clear(NOTIF_ID, () => {
+    chrome.notifications.create(NOTIF_ID, {
+      type:     "basic",
+      iconUrl:  chrome.runtime.getURL("icons/icon48.png"),
+      title:    "Way2Say",
+      message:  "Generating comment...",
+      priority: 2,
+    });
+  });
+}
+
+function notifySuccess(text) {
+  const preview = text.length > 60 ? text.slice(0, 60) + "..." : text;
+  chrome.notifications.clear(NOTIF_ID, () => {
+    chrome.notifications.create(NOTIF_ID, {
+      type:     "basic",
+      iconUrl:  chrome.runtime.getURL("icons/icon48.png"),
+      title:    "Way2Say - Done",
+      message:  'Copied! "' + preview + '"',
+      priority: 1,
+    });
+  });
+}
+
+function notifyError(msg) {
+  chrome.notifications.clear(NOTIF_ID, () => {
+    chrome.notifications.create(NOTIF_ID, {
+      type:     "basic",
+      iconUrl:  chrome.runtime.getURL("icons/icon48.png"),
+      title:    "Way2Say - Error",
+      message:  msg,
+      priority: 2,
+    });
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

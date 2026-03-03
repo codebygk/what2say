@@ -7,7 +7,7 @@ export const OLLAMA = {
   BASE_URL: "http://localhost:11434",
   ENDPOINT: "/api/chat",
   DEFAULT_MODEL: "llama3:8b",
-  TIMEOUT_MS: 15_000,
+  TIMEOUT_MS: 60000, // 60 seconds
 };
 
 export const CONTEXT_MENU = {
@@ -34,8 +34,10 @@ export const DEFAULT_SETTINGS = {
   model: "llama3:8b",
   tone: "professional",
   persona: "",
-  charLimit: 300,
+  charLimit: 500,
 };
+
+
 
 export const MESSAGES = {
   GENERATE_COMMENT: "GENERATE_COMMENT",
@@ -45,5 +47,5 @@ export const MESSAGES = {
 export const NOTIFICATIONS = {
   SUCCESS_ID: "ai-commenter-success",
   ERROR_ID: "ai-commenter-error",
-  ICON: "/icons/Icon-48.png",
+  ICON: "/icons/icon48.png",
 };
