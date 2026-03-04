@@ -5,9 +5,10 @@
 //  Used by both service-worker.js and popup.js
 // ─────────────────────────────────────────────
 
-const LICENSE_API     = "https://ai-commenter-license.YOUR_SUBDOMAIN.workers.dev";
-const CACHE_DAYS      = 7;    // days before re-validating with server
-const MS_PER_DAY      = 86_400_000;
+const LICENSE_API =
+  "https://way2say-license.gopalakrishnan-work-203.workers.dev";
+const CACHE_DAYS = 7; // days before re-validating with server
+const MS_PER_DAY = 86_400_000;
 
 // ── Public API ────────────────────────────────
 
@@ -24,13 +25,16 @@ export async function activateLicense(key) {
   let data;
   try {
     const res = await fetch(`${LICENSE_API}/validate`, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ key: key.trim().toUpperCase(), deviceId }),
+      body: JSON.stringify({ key: key.trim().toUpperCase(), deviceId }),
     });
     data = await res.json();
   } catch {
-    return { ok: false, error: "Cannot reach license server. Check your connection." };
+    return {
+      ok: false,
+      error: "Cannot reach license server. Check your connection.",
+    };
   }
 
   if (!data.valid) {
@@ -40,7 +44,7 @@ export async function activateLicense(key) {
   // Cache the result locally
   await saveLicenseCache({
     key,
-    plan:          data.plan,
+    plan: data.plan,
     lastValidated: Date.now(),
     deviceId,
   });
@@ -80,9 +84,9 @@ export async function deactivateLicense() {
 
   try {
     await fetch(`${LICENSE_API}/deactivate`, {
-      method:  "POST",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ key: cache.key, deviceId: cache.deviceId }),
+      body: JSON.stringify({ key: cache.key, deviceId: cache.deviceId }),
     });
   } catch {
     // Best effort — clear locally regardless
@@ -97,20 +101,20 @@ export async function deactivateLicense() {
 function loadLicenseCache() {
   return new Promise((resolve) =>
     chrome.storage.local.get({ licenseCache: null }, ({ licenseCache }) =>
-      resolve(licenseCache)
-    )
+      resolve(licenseCache),
+    ),
   );
 }
 
 function saveLicenseCache(data) {
   return new Promise((resolve) =>
-    chrome.storage.local.set({ licenseCache: data }, resolve)
+    chrome.storage.local.set({ licenseCache: data }, resolve),
   );
 }
 
 function clearLicenseCache() {
   return new Promise((resolve) =>
-    chrome.storage.local.remove("licenseCache", resolve)
+    chrome.storage.local.remove("licenseCache", resolve),
   );
 }
 
@@ -123,7 +127,10 @@ function clearLicenseCache() {
 export async function getOrCreateDeviceId() {
   return new Promise((resolve) => {
     chrome.storage.local.get({ deviceId: "" }, async ({ deviceId }) => {
-      if (deviceId) { resolve(deviceId); return; }
+      if (deviceId) {
+        resolve(deviceId);
+        return;
+      }
       const newId = crypto.randomUUID();
       chrome.storage.local.set({ deviceId: newId }, () => resolve(newId));
     });

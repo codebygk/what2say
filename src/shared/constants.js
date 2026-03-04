@@ -11,8 +11,8 @@ export const OLLAMA = {
 };
 
 export const CONTEXT_MENU = {
-  ROOT_ID: "ai-commenter-root",
-  GENERATE_ID: "ai-commenter-generate",
+  ROOT_ID: "way2say-root",
+  GENERATE_ID: "way2say-generate",
 };
 
 export const STORAGE_KEYS = {
@@ -37,15 +37,13 @@ export const DEFAULT_SETTINGS = {
   charLimit: 500,
 };
 
-
-
 export const MESSAGES = {
   GENERATE_COMMENT: "GENERATE_COMMENT",
   SETTINGS_UPDATED: "SETTINGS_UPDATED",
 };
 
 export const NOTIFICATIONS = {
-  SUCCESS_ID: "ai-commenter-success",
-  ERROR_ID: "ai-commenter-error",
+  SUCCESS_ID: "way2say-success",
+  ERROR_ID: "way2say-error",
   ICON: "/icons/icon48.png",
 };

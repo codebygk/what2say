@@ -17,7 +17,8 @@
     "http://localhost:11434/*",
     "https://www.linkedin.com/*",
     "https://x.com/*",
-    "https://twitter.com/*"
+    "https://twitter.com/*",
+    "https://*.workers.dev/*"
   ],
 
   "background": {

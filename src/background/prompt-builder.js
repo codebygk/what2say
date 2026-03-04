@@ -20,7 +20,7 @@ export function buildCommentPrompt({ postText, tone, persona, charLimit }) {
 
   const personaLine =
     persona && persona.trim()
-      ? `You are writing as: ${persona.trim()}.`
+      ? `You are writing as a personal with a strong personality of: ${persona.trim()}.`
       : "You are a thoughtful professional engaging with content online.";
 
   const systemLines = [
