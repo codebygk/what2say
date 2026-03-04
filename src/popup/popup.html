@@ -2,7 +2,7 @@
 <html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <title>DOM2POM</title>
+  <title>Way2Say</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap');
 
@@ -19,15 +19,15 @@
       --accent-subtle: rgba(79, 110, 247, 0.1);
       --success: #059669;
       --success-subtle: rgba(5, 150, 105, 0.12);
+      --success-border: rgba(5, 150, 105, 0.3);
       --warning: #d97706;
       --warning-subtle: rgba(217, 119, 6, 0.12);
+      --warning-border: rgba(217, 119, 6, 0.35);
       --danger: #dc2626;
       --danger-subtle: rgba(220, 38, 38, 0.12);
       --normal: #6b7280;
       --normal-subtle: rgba(107, 114, 128, 0.12);
       --border: #dde2ed;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-      --shadow: 0 4px 12px rgba(0,0,0,0.08);
       --radius: 10px;
       --radius-sm: 7px;
       --radius-xs: 5px;
@@ -47,19 +47,18 @@
       --accent-subtle: rgba(110, 147, 250, 0.12);
       --success: #3fb950;
       --success-subtle: rgba(63, 185, 80, 0.12);
+      --success-border: rgba(63, 185, 80, 0.3);
       --warning: #d29922;
       --warning-subtle: rgba(210, 153, 34, 0.12);
+      --warning-border: rgba(210, 153, 34, 0.35);
       --danger: #f85149;
       --danger-subtle: rgba(248, 81, 73, 0.12);
       --normal: #7d8590;
       --normal-subtle: rgba(125, 133, 144, 0.12);
       --border: #30363d;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-      --shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
 
     body {
       width: 420px;
@@ -67,15 +66,11 @@
       background: var(--bg-primary);
       color: var(--text-primary);
       font-size: 13px;
-      height: 100%;
-      padding: 0;
       transition: background 0.2s, color 0.2s;
     }
 
-    
     /* ── HEADER ── */
     .header {
-      flex-shrink: 0;
       padding: 14px 16px 12px;
       background: var(--bg-secondary);
       border-bottom: 1px solid var(--border);
@@ -85,33 +80,12 @@
       gap: 10px;
     }
 
-    .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-    }
+    .header-brand { display: flex; align-items: center; gap: 9px; }
+    .brand-icon { padding: 3pt; }
+    .brand-text h2 { font-size: 14px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.2; margin-bottom: 5px; }
+    .brand-text p  { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
 
-    .brand-icon {
-      padding: 3pt;
-    }
-
-    .brand-text h2 {
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: -0.2px;
-      line-height: 1.2;
-      margin-bottom: 5px;
-    }
-
-    .brand-text p {
-      font-size: 11px;
-      color: var(--text-secondary);
-      margin-top: 1px;
-    }
-
-    .header-actions {
-      display: flex; align-items: center; gap: 6px;
-    }
+    .header-actions { display: flex; align-items: center; gap: 6px; }
 
     .icon-btn {
       width: 32px; height: 32px;
@@ -123,19 +97,218 @@
       display: flex; align-items: center; justify-content: center;
       transition: all 0.15s;
     }
+    .icon-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
 
-    .icon-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      background: var(--accent-subtle);
+    /* ── TIER BADGE ── */
+    .tier-badge {
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      border-radius: 4px;
+      border: 1px solid;
+    }
+    .tier-badge.free { background: var(--normal-subtle); color: var(--normal); border-color: rgba(107,114,128,0.25); }
+    .tier-badge.pro  { background: var(--success-subtle); color: var(--success); border-color: var(--success-border); }
+
+    /* ── STATUS ── */
+    #ollama-status {
+      margin: 10px 16px 0;
+      padding: 7px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 11px; font-weight: 500;
+      display: flex; align-items: center; gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+    #ollama-status.connected { border-color: var(--success-border); background: var(--success-subtle); color: var(--success); }
+    #ollama-status.error     { border-color: rgba(220,38,38,0.3); background: var(--danger-subtle); color: var(--danger); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+    /* ── LICENSE SECTION ── */
+    .license-section {
+      margin: 10px 16px 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s;
     }
 
-    .section {
-      margin: 8px 0;
+    /* Pro activated state */
+    .license-section.is-pro {
+      border-color: var(--success-border);
     }
-    
-    /* ── INPUTS ── */
-    input[type="text"], select, textarea {
+
+    .license-header {
+      padding: 9px 12px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .license-header:hover { background: var(--bg-card); }
+
+    .license-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .license-header-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .license-chevron {
+      color: var(--text-secondary);
+      transition: transform 0.2s;
+      display: flex;
+      align-items: center;
+    }
+    .license-chevron.open { transform: rotate(180deg); }
+
+    /* License body — collapsible */
+    .license-body {
+      padding: 12px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      background: var(--bg-primary);
+    }
+    .license-body.open { display: flex; }
+
+    /* Pro active view */
+    .pro-active-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .pro-active-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .pro-active-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--success);
+    }
+
+    .pro-active-email {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    /* Upgrade banner inside license body (free only) */
+    .upgrade-banner {
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      background: var(--warning-subtle);
+      border: 1px solid var(--warning-border);
+      font-size: 11px;
+      color: var(--warning);
+      line-height: 1.5;
+    }
+    .upgrade-banner strong { font-weight: 700; }
+
+    /* Key input row */
+    .license-input-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    #license-key-input {
+      flex: 1;
+      padding: 7px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: var(--mono);
+      font-size: 11px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.5px;
+    }
+    #license-key-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
+    #license-key-input.error { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-subtle); }
+
+    #license-activate-btn {
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    #license-activate-btn:hover:not(:disabled) { opacity: 0.85; }
+    #license-activate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #license-deactivate-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--danger-subtle);
+      background: transparent;
+      color: var(--danger);
+      font-family: var(--sans);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    #license-deactivate-btn:hover { background: var(--danger-subtle); }
+
+    .license-error {
+      font-size: 11px;
+      color: var(--danger);
+      min-height: 14px;
+      font-family: var(--mono);
+    }
+
+    .license-hint {
+      font-size: 10px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .license-hint a { color: var(--accent); text-decoration: none; }
+    .license-hint a:hover { text-decoration: underline; }
+
+    /* ── FORM ── */
+    .form-body { padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+
+    label {
+      font-size: 11px; font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      display: flex; align-items: center; gap: 5px;
+    }
+
+    select, input[type="text"], textarea {
       width: 100%;
       padding: 8px 11px;
       border: 1px solid var(--border);
@@ -144,155 +317,9 @@
       color: var(--text-primary);
       font-family: var(--sans);
       font-size: 13px;
+      outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
-    }
-
-    input[type="text"]:focus, select:focus, textarea:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-subtle);
-    }
-
-    /* ── BUTTONS ── */
-    .btn-group {
-      display: flex;
-      gap: 7px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 7px 12px;
-      border-radius: var(--radius-sm);
-      font-family: var(--sans);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      color: var(--text-primary);
-      transition: all 0.15s;
-      white-space: nowrap;
-    }
-
-    .btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      background: var(--accent-subtle);
-      transform: translateY(-1px);
-    }
-
-    .btn.primary {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-
-    .btn.primary:hover {
-      background: var(--accent-hover);
-      border-color: var(--accent-hover);
-      color: #fff;
-      transform: translateY(-1px);
-    }
-
-    .btn.success {
-      background: var(--success);
-      color: #fff;
-      border-color: var(--success);
-    }
-
-    .btn.success:hover {
-      opacity: 0.9;
-      color: #fff;
-      transform: translateY(-1px);
-    }
-
-    .btn.danger {
-      background: var(--danger);
-      color: #fff;
-      border-color: var(--danger);
-    }
-
-    /* Active select mode highlight */
-    .btn.selecting {
-      background: linear-gradient(135deg, #7c3aed, var(--accent));
-      color: #fff;
-      border-color: transparent;
-      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25);
-      animation: pulse-select 2s ease-in-out infinite;
-    }
-
-    .btn.selecting:hover {
-      background: linear-gradient(135deg, #6d28d9, #3b57e6);
-      color: #fff;
-      transform: translateY(-1px);
-    }
-
-    
-    /* ── Status pill ── */
-    #ollama-status {
-      margin: 12px 16px 0;
-      padding: 7px 10px;
-      border-radius: var(--radius);
-      font-size: 11px;
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      transition: all 0.2s;
-    }
-
-    #ollama-status.connected { border-color: var(--success-bd); background: var(--success-bg); color: var(--success); }
-    #ollama-status.error     { border-color: var(--error-bd);   background: var(--error-bg);   color: var(--error); }
-
-    .status-dot {
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: currentColor;
-      flex-shrink: 0;
-    }
-
-    /* ── Form ── */
-    .form-body {
-      padding: 12px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-    }
-
-    select, input, textarea {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-size: 13px;
-      font-family: inherit;
-      padding: 8px 10px;
-      width: 100%;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s, background 0.2s;
-      appearance: none;
-      -webkit-appearance: none;
+      appearance: none; -webkit-appearance: none;
     }
 
     select {
@@ -302,107 +329,48 @@
       padding-right: 28px;
     }
 
-    select:focus, input:focus, textarea:focus {
+    select:focus, input[type="text"]:focus, textarea:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-dim);
+      box-shadow: 0 0 0 3px var(--accent-subtle);
     }
 
-    textarea {
-      resize: vertical;
-      min-height: 64px;
-      line-height: 1.5;
-    }
+    select:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    .char-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
 
+    .char-row { display: flex; align-items: center; gap: 10px; }
     .char-row input[type="range"] {
-      flex: 1;
-      padding: 0;
-      cursor: pointer;
+      flex: 1; padding: 0; cursor: pointer;
       accent-color: var(--accent);
-      height: 4px;
-      border: none;
-      box-shadow: none;
-      background: transparent;
+      height: 4px; border: none; box-shadow: none; background: transparent;
     }
+    .char-value { font-size: 12px; font-weight: 700; color: var(--accent); min-width: 40px; text-align: right; font-family: var(--mono); }
 
-    .char-value {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--accent);
-      min-width: 40px;
-      text-align: right;
-    }
+    /* ── DIVIDER ── */
+    .divider { height: 1px; background: var(--border); margin: 0 16px; }
 
-    /* ── Divider ── */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 0 16px;
-    }
+    /* ── ACTIONS ── */
+    .actions { padding: 10px 16px 0; display: flex; gap: 8px; }
 
-    /* ── Buttons ── */
-    .actions {
-      padding: 12px 16px 0;
-      display: flex;
-      gap: 8px;
-    }
-
-    button {
-      flex: 1;
-      padding: 9px;
-      border-radius: var(--radius);
+    .actions button {
+      flex: 1; padding: 9px;
+      border-radius: var(--radius-sm);
       border: 1px solid var(--border);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-      font-family: inherit;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; font-family: var(--sans);
     }
 
-    #save-btn {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
+    #save-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
+    #save-btn:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+    #save-btn:disabled { background: var(--bg-card); border-color: var(--border); color: var(--text-secondary); cursor: not-allowed; }
 
-    #save-btn:hover:not(:disabled) { opacity: 0.88; }
+    #reset-btn { background: var(--bg-card); color: var(--text-secondary); }
+    #reset-btn:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-subtle); }
 
-    #save-btn:disabled {
-      background: var(--surface2);
-      border-color: var(--border);
-      color: var(--muted);
-      cursor: not-allowed;
-    }
-
-    #reset-btn {
-      background: var(--surface);
-      color: var(--muted);
-    }
-
-    #reset-btn:hover {
-      border-color: var(--error);
-      color: var(--error);
-      background: var(--error-bg);
-    }
-
-    /* ── Save confirmation ── */
-    #save-confirm {
-      text-align: center;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--success);
-      margin: 8px 16px 0;
-      min-height: 16px;
-    }
+    #save-confirm { text-align: center; font-size: 11px; font-weight: 500; color: var(--success); margin: 8px 16px 0; min-height: 16px; }
 
     /* ── FOOTER ── */
     .app-footer {
-      flex-shrink: 0;
       padding: 9px 16px;
       font-size: 10.5px;
       color: var(--text-secondary);
@@ -410,36 +378,30 @@
       background: var(--bg-secondary);
       display: flex;
       align-items: center;
-      justify-content: flex-start;
       gap: 6px;
       flex-wrap: wrap;
+      margin-top: 10px;
     }
-
-    .app-footer a {
-      color: var(--text-secondary);
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
+    .app-footer a { color: var(--text-secondary); text-decoration: none; transition: color 0.15s; }
     .app-footer a:hover { color: var(--accent); }
-
     .footer-sep { opacity: 0.4; }
-
   </style>
 </head>
 <body>
 
+  <!-- HEADER -->
   <div class="header">
     <div class="header-brand">
-      <div class="brand-icon">      
+      <div class="brand-icon">
         <img src="/icons/icon32.png" alt="Logo" width="32" height="32" />
       </div>
       <div class="brand-text">
         <h2>Way2Say</h2>
-        <p>Select text > Right-click > Generate Comment.</p>
+        <p>Select text › Right-click › Generate Comment</p>
       </div>
     </div>
     <div class="header-actions">
+      <span class="tier-badge free" id="tier-badge">Free</span>
       <button id="themeToggleBtn" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="currentColor"/>
@@ -448,12 +410,69 @@
     </div>
   </div>
 
-  <div id="ollama-status" class="section">
+  <!-- OLLAMA STATUS -->
+  <div id="ollama-status">
     <span class="status-dot"></span>
     <span id="status-text">Checking Ollama…</span>
   </div>
 
-  <div class="section form-body">
+  <!-- LICENSE SECTION -->
+  <div class="license-section" id="license-section">
+
+    <div class="license-header" id="license-header">
+      <div class="license-header-left">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0110 0v4"/>
+        </svg>
+        License
+      </div>
+      <div class="license-header-right">
+        <span id="license-status-label" style="font-size:11px;color:var(--text-secondary)">Click to activate Pro</span>
+        <span class="license-chevron" id="license-chevron">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+        </span>
+      </div>
+    </div>
+
+    <div class="license-body" id="license-body">
+
+      <!-- FREE STATE -->
+      <div id="free-state">
+        <div class="upgrade-banner">
+          <strong>Free tier</strong> — limited to 1 tone &amp; 300 char comments.<br/>
+          Upgrade to Pro for all tones, higher limits &amp; more.
+        </div>
+        <div class="license-input-row" style="margin-top:8px;">
+          <input id="license-key-input" type="text" placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX" spellcheck="false" autocomplete="off" />
+          <button id="license-activate-btn">Activate</button>
+        </div>
+        <div class="license-error" id="license-error"></div>
+        <p class="license-hint">
+          Don't have a license? <a href="https://YOUR_STORE_URL" target="_blank" rel="noopener">Get Pro →</a>
+        </p>
+      </div>
+
+      <!-- PRO ACTIVE STATE (hidden until activated) -->
+      <div id="pro-state" style="display:none;">
+        <div class="pro-active-row">
+          <div class="pro-active-info">
+            <span class="pro-active-label">✓ Pro Active</span>
+            <span class="pro-active-email" id="pro-key-preview"></span>
+          </div>
+          <button id="license-deactivate-btn">Deactivate</button>
+        </div>
+        <p class="license-hint" style="margin-top:4px;">
+          Need to switch devices? Deactivate here first (2 device limit).
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS FORM -->
+  <div class="form-body">
+
     <div class="field">
       <label for="model-select">Model</label>
       <select id="model-select">
@@ -461,8 +480,11 @@
       </select>
     </div>
 
-    <div class="section field">
-      <label for="tone-select">Tone</label>
+    <div class="field">
+      <label for="tone-select">
+        Tone
+        <span id="tone-lock" style="font-size:10px;opacity:0.5;display:none;">🔒 Pro</span>
+      </label>
       <select id="tone-select">
         <option value="professional">Professional &amp; Insightful</option>
         <option value="friendly">Warm &amp; Friendly</option>
@@ -472,20 +494,26 @@
       </select>
     </div>
 
-    <div class="section field">
-      <label for="char-limit">Max Length</label>
-      <div class="char-row">
+    <div class="field">
+      <label for="char-limit">
+        Max Length
+        <span id="char-lock" style="font-size:10px;opacity:0.5;display:none;">🔒 Pro</span>
+      </label>
+      <!-- Pro: slider -->
+      <div class="char-row" id="char-slider-row">
         <input type="range" id="char-limit" min="250" max="5000" step="250" value="1000" />
         <span class="char-value" id="char-display">1000</span>
       </div>
+      <!-- Free: static -->
+      <div id="char-fixed-row" style="display:none;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-card);font-size:12px;color:var(--text-secondary);display:none;justify-content:space-between;align-items:center;">
+        <span>300 characters (Free limit)</span>
+        <span style="font-size:10px;color:var(--warning);font-weight:600;">Upgrade for more</span>
+      </div>
     </div>
 
-    <div class="section field">
+    <div class="field">
       <label for="persona">Your Persona <span style="opacity:0.5;font-weight:400">(optional)</span></label>
-      <textarea
-        id="persona"
-        placeholder="e.g. Senior software engineer interested in AI and distributed systems"
-      ></textarea>
+      <textarea id="persona" placeholder="e.g. Senior software engineer interested in AI and distributed systems"></textarea>
     </div>
 
   </div>
@@ -499,24 +527,22 @@
 
   <div id="save-confirm"></div>
 
-
-  <!-- STICKY FOOTER -->
+  <!-- FOOTER -->
   <footer class="app-footer">
-    <span style="font-weight:600;">What2Say</span>
+    <span style="font-weight:600;">Way2Say</span>
     <span class="footer-sep">·</span>
     <span class="footer-version">v1.0</span>
     <span class="footer-sep">·</span>
-    <a id="helpLink" href="#" title="Help">Help</a>
+    <a href="#" id="helpLink">Help</a>
     <span class="footer-sep">·</span>
-    <a id="feedbackLink" href="https://forms.gle/xKDf1rLYvrEsGGHd7" target="_blank" rel="noopener">Feedback</a>
+    <a href="https://forms.gle/xKDf1rLYvrEsGGHd7" target="_blank" rel="noopener">Feedback</a>
     <span class="footer-sep">·</span>
-    <a id="donateLink" href="https://buymeacoffee.com/codebygk" target="_blank" rel="noopener">Donate</a>
+    <a href="https://buymeacoffee.com/codebygk" target="_blank" rel="noopener">Donate</a>
     <span class="footer-sep">·</span>
-    <a id="linkedInLink" href="https://linkedin.com/in/codebygk" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://linkedin.com/in/codebygk" target="_blank" rel="noopener">LinkedIn</a>
     <span class="footer-sep">·</span>
-    <a id="twitterLink" href="https://twitter.com/codebygk" target="_blank" rel="noopener">Twitter</a>
+    <a href="https://twitter.com/codebygk" target="_blank" rel="noopener">Twitter</a>
   </footer>
-
 
   <script type="module" src="popup.js"></script>
 </body>

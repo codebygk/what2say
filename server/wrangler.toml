@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────
+#  Wrangler config — Cloudflare Worker
+#  Deploy with: npx wrangler deploy
+# ─────────────────────────────────────────────
+
+name = "ai-commenter-license"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace — stores all license data
+# After creating with `npx wrangler kv:namespace create LICENSES`
+# paste the id below
+[[kv_namespaces]]
+binding = "LICENSES"
+id      = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# Environment variables
+# Set the real secret with:
+#   npx wrangler secret put LEMON_SQUEEZY_WEBHOOK_SECRET
+[vars]
+LEMON_SQUEEZY_WEBHOOK_SECRET = "set-via-wrangler-secret"
