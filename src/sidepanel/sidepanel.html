@@ -264,6 +264,66 @@
       background: var(--bg-secondary);
       border-top: 1px solid var(--border);
     }
+    
+    /* ── STATS BAR ── */
+    .stats-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 8px;
+    }
+    .stat-item {
+      display: flex; flex-direction: column; align-items: center; gap: 1px;
+      flex: 1;
+    }
+    .stat-item + .stat-item { border-left: 1px solid var(--border); }
+    .stat-val {
+      font-family: var(--mono); font-size: 15px; font-weight: 700;
+      color: var(--accent); line-height: 1;
+    }
+    .stat-label {
+      font-size: 9px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+
+    /* ── PRO UPSELL STRIP (below textarea, free only) ── */
+    .pro-upsell-strip {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 14px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      /* display: none; */
+      align-items: flex-start;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .pro-upsell-strip.visible { display: flex; }
+    .pro-upsell-text { flex: 1; }
+    .pro-upsell-title {
+      font-size: 11px; font-weight: 700;
+      color: var(--text-primary); margin-bottom: 8px;
+    }
+    .pro-upsell-features {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px;
+    }
+    .upsell-tag {
+      font-size: 9px; font-weight: 600;
+      padding: 2px 6px; border-radius: 3px;
+      background: var(--accent-subtle);
+      color: var(--accent);
+      border: 1px solid rgba(79,110,247,0.2);
+    }
+    .pro-upsell-btn {
+      padding: 5px 10px; border-radius: var(--radius-sm);
+      background: var(--accent); color: #fff; border: none;
+      font-family: var(--sans); font-size: 11px; font-weight: 700;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: opacity 0.15s; align-self: center;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .pro-upsell-btn:hover { opacity: 0.85; }
 
     .copy-feedback {
       text-align: center; font-size: 11px; font-weight: 600;
@@ -644,6 +704,25 @@
 
   <!-- ═══ GENERATE TAB ═══ -->
   <div class="tab-panel active" id="tab-generate">
+    <!-- Stats bar — always visible in generate tab -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-item">
+        <span class="stat-val" id="statTotal">0</span>
+        <span class="stat-label">Total</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-val" id="statToday">0</span>
+        <span class="stat-label">Today</span>
+      </div>
+      <div class="stat-item" id="statProItem" style="display:none;">
+        <span class="stat-val" style="color:var(--success);">Pro</span>
+        <span class="stat-label">Plan</span>
+      </div>
+      <div class="stat-item" id="statFreeItem">
+        <span class="stat-val" style="color:var(--warning);">Free</span>
+        <span class="stat-label">Plan</span>
+      </div>
+    </div>
 
     <div class="state-idle" id="stateIdle">
       <div class="idle-icon">✍️</div>
@@ -674,10 +753,11 @@
     </div>
 
     <div class="state-result" id="stateResult">
-      <div class="post-preview" id="postPreview" style="display:none;">
+            <div class="post-preview" id="postPreview" style="display:none;">
         <div class="post-preview-label">Replying to</div>
         <div class="post-preview-text" id="postPreviewText"></div>
       </div>
+      
       <div class="result-meta">
         <div class="result-ready">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -686,11 +766,25 @@
         <span class="char-count" id="charCount">0 chars</span>
       </div>
       <textarea class="result-textarea" id="resultTextarea" spellcheck="true" placeholder="Your comment will appear here…"></textarea>
+    <!-- Pro upsell strip — shown below textarea for free users -->
+     <div class="pro-upsell-strip" id="proUpsellStrip">
+        <div class="pro-upsell-text">
+          <div class="pro-upsell-title">✨ Upgrade once. Better comments forever.</div>
+          <div class="pro-upsell-features">
+            <span class="upsell-tag">2000 chars</span>
+            <span class="upsell-tag">5 tones</span>
+            <span class="upsell-tag">Lifetime access</span>
+            <span class="upsell-tag">Future updates</span>
+          </div>
+        </div>
+        <a class="pro-upsell-btn" id="proUpsellBtn" href="https://qacancode.lemonsqueezy.com/checkout/buy/43b47d7c-2415-455e-8720-825b0b17b534" target="_blank" rel="noopener">$4.99 →</a>
+      </div>
     </div>
+      
 
     <div class="action-bar" id="actionBar">
-      <button class="btn" id="regenerateBtn">↺ Regenerate</button>
-      <button class="btn primary" id="copyBtn">📋 Copy</button>
+      <button class="btn" id="regenerateBtn">Regenerate</button>
+      <button class="btn primary" id="copyBtn">Copy</button>
     </div>
     <div class="copy-feedback" id="copyFeedback" style="display:none;"></div>
 
@@ -717,7 +811,7 @@
         <div class="section-body" id="license-body">
           <div id="free-state">
             <div class="upgrade-banner">
-              <strong>Free tier</strong> — 1 tone, 100–300 char limit.<br/>
+              <strong>Free tier</strong> — 1 tone, 100-300 char limit.<br/>
               <strong>Pro ($4.99)</strong> unlocks all tones, custom char limits &amp; persona.
             </div>
             <div class="license-input-row" style="margin-top:8px;">
@@ -839,7 +933,7 @@
 
           <!-- Free fixed display -->
           <div class="char-fixed" id="char-fixed-row" style="display:none;">
-            <span>100 – 300 characters (Free limit)</span>
+            <span>100 - 300 characters (Free limit)</span>
             <span class="upgrade-hint">⬆ Upgrade</span>
           </div>
         </div>

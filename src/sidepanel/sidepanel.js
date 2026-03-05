@@ -125,6 +125,8 @@ const personaInput         = document.getElementById("persona");
 const saveBtn              = document.getElementById("save-btn");
 const resetBtn             = document.getElementById("reset-btn");
 const saveConfirm          = document.getElementById("save-confirm");
+const statTotal         = document.getElementById("statTotal");
+const statToday        = document.getElementById("statToday");
 
 let isPro          = false;
 let activeProvider = "ollama";
@@ -200,6 +202,7 @@ async function startGenerate(text) {
       updateCharCount();
       showGenerateState("result");
       resultTextarea.focus();
+      updateStats(); // refresh stats bar after generation
     } else {
       errorMessage.textContent = result?.error ?? "Unknown error occurred.";
       showGenerateState("error");
@@ -223,23 +226,41 @@ function updateCharCount() {
   charCountEl.className   = len > 3000 ? "char-count over" : "char-count";
 }
 
+// ── Stats Bar ─────────────────────────────────
+async function updateStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  const data  = await loadLocal({ usageCount: 0, usageToday: 0, usageDate: "" });
+
+  // Reset today counter if it's a new day
+  const todayCount = data.usageDate === today ? data.usageToday : 0;
+
+  statTotal.textContent = data.usageCount;
+  statToday.textContent = todayCount;
+
+  // Show pro/free badge in stats
+  const { licenseCache } = await loadLocal({ licenseCache: null });
+  const pro = licenseCache?.plan === "pro";
+  statProItem.style.display  = pro ? "flex" : "none";
+  statFreeItem.style.display = pro ? "none" : "flex";
+
+  // Show upsell strip only for free users when result is visible
+  proUpsellStrip.classList.toggle("visible");
+}
+
 copyBtn.addEventListener("click", async () => {
   const text = resultTextarea.value.trim();
   if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
-    copyBtn.textContent      = "✓ Copied!";
+    copyBtn.textContent      = "Copied!";
     copyBtn.className        = "btn success";
-    copyFeedback.textContent = "Copied! Go paste it.";
     setTimeout(() => {
-      copyBtn.textContent      = "📋 Copy";
+      copyBtn.textContent      = "Copy";
       copyBtn.className        = "btn primary";
-      copyFeedback.textContent = "";
     }, 2500);
   } catch {
     resultTextarea.select();
     document.execCommand("copy");
-    copyFeedback.textContent = "Copied!";
     setTimeout(() => { copyFeedback.textContent = ""; }, 2000);
   }
 });
@@ -762,4 +783,4 @@ function showSaveConfirm(msg) {
 }
 
 // ── Boot ──────────────────────────────────────
-init();
+init().then(updateStats);

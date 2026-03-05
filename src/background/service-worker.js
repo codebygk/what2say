@@ -258,15 +258,33 @@ async function handleGenerateRequest(postText) {
 
   try {
     let comment = await callProvider(messages, settings);
-    console.log(`[Way2Say] Raw comment length: ${comment.length}, limits: ${minChars}–${maxChars}`);
+    console.log(`[Way2Say] Raw comment length: ${comment.length}, limits: ${minChars}-${maxChars}`);
     comment = await enforceCharLimits(comment, minChars, maxChars, messages, settings);
     console.log(`[Way2Say] Final comment length: ${comment.length}`);
     clearBadge();
+    await incrementUsage();
     return { ok: true, comment, provider: settings.provider, model: settings.model };
   } catch (err) {
     clearBadge();
     return { ok: false, error: err.message };
   }
+}
+
+async function incrementUsage() {
+  return new Promise((resolve) => {
+    const today = new Date().toISOString().slice(0, 10);
+    chrome.storage.local.get(
+      { usageCount: 0, usageToday: 0, usageDate: "" },
+      (data) => {
+        const todayCount = data.usageDate === today ? data.usageToday : 0;
+        chrome.storage.local.set({
+          usageCount: data.usageCount + 1,
+          usageToday: todayCount + 1,
+          usageDate:  today,
+        }, resolve);
+      }
+    );
+  });
 }
 
 // ── Char Limit Enforcement ────────────────────
@@ -339,7 +357,7 @@ async function enforceCharLimits(comment, minChars, maxChars, messages, settings
   // STEP 3: Final guaranteed clamp — runs no matter what
   if (comment.length > maxChars) comment = comment.slice(0, maxChars);
 
-  console.log(`[Way2Say] enforceCharLimits done: ${comment.length} chars (limit ${minChars}–${maxChars})`);
+  console.log(`[Way2Say] enforceCharLimits done: ${comment.length} chars (limit ${minChars}-${maxChars})`);
   return comment;
 }
 
