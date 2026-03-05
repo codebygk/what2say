@@ -131,6 +131,7 @@ let activeProvider = "ollama";
 let ollamaModels   = [];
 let savedSnapshot  = null;
 let lastPostText   = "";
+let savedProviderSnapshot = null;
 
 // ── Boot ──────────────────────────────────────
 async function init() {
@@ -290,17 +291,23 @@ async function initProvider() {
       ollamaModels = r?.models ?? [];
       renderProviderFields(activeProvider, settings);
       updateOllamaStatus(ollamaModels);
+      savedProviderSnapshot = getProviderFormState();
+      watchProviderFields();
     });
+  } else {
+    renderProviderFields(activeProvider, settings);
+    savedProviderSnapshot = getProviderFormState();
+    watchProviderFields();
   }
 
   setActiveProviderTab(activeProvider);
-  renderProviderFields(activeProvider, settings);
   providerLabelEl.textContent = PROVIDER_CONFIG[activeProvider]?.label ?? activeProvider;
 
   timeoutSlider.value        = settings.timeoutSecs ?? 60;
-  timeoutDisplay.textContent = timeoutSlider.value + "s";
+  timeoutDisplay.textContent = timeoutSlider.value + " s";
   timeoutSlider.addEventListener("input", () => {
-    timeoutDisplay.textContent = timeoutSlider.value + "s";
+    timeoutDisplay.textContent = timeoutSlider.value + " s";
+    updateSaveProviderBtn();
   });
 }
 
@@ -316,14 +323,19 @@ providerTabs.forEach(tab => {
         ollamaModels = r?.models ?? [];
         renderProviderFields(p, settings);
         updateOllamaStatus(ollamaModels);
+        savedProviderSnapshot = getProviderFormState();
+        watchProviderFields();
       });
     } else {
       renderProviderFields(p, settings);
+      savedProviderSnapshot = getProviderFormState();
+      watchProviderFields();
     }
 
     timeoutSlider.value        = settings.timeoutSecs ?? 60;
     timeoutDisplay.textContent = timeoutSlider.value + "s";
     updateOllamaStatus(ollamaModels);
+    saveProviderBtn.disabled   = true;
     providerStatus.textContent = "";
     providerStatus.className   = "provider-status";
   });
@@ -379,6 +391,25 @@ function renderProviderFields(provider, settings) {
   providerFields.innerHTML = html;
 }
 
+function getProviderFormState() {
+  const inputs = providerFields.querySelectorAll("[data-key]");
+  const state = { provider: activeProvider, timeoutSecs: Number(timeoutSlider.value) };
+  inputs.forEach(el => { state[el.dataset.key] = el.value.trim(); });
+  return JSON.stringify(state);
+}
+
+function updateSaveProviderBtn() {
+  saveProviderBtn.disabled = getProviderFormState() === savedProviderSnapshot;
+}
+
+function watchProviderFields() {
+  providerFields.querySelectorAll("[data-key]").forEach(el => {
+    el.addEventListener("input", updateSaveProviderBtn);
+    el.addEventListener("change", updateSaveProviderBtn);
+  });
+  timeoutSlider.addEventListener("input", updateSaveProviderBtn);
+}
+
 saveProviderBtn.addEventListener("click", async () => {
   const inputs  = providerFields.querySelectorAll("[data-key]");
   const updates = { provider: activeProvider };
@@ -386,6 +417,8 @@ saveProviderBtn.addEventListener("click", async () => {
   updates.timeoutSecs = Number(timeoutSlider.value);
 
   await saveSettings(updates);
+  savedProviderSnapshot = getProviderFormState();
+  saveProviderBtn.disabled = true;
   providerLabelEl.textContent = PROVIDER_CONFIG[activeProvider]?.label ?? activeProvider;
   providerStatus.textContent  = "Saved ✓";
   providerStatus.className    = "provider-status ok";
@@ -525,11 +558,10 @@ async function validateWithServer(key) {
 // ── Char limit badge + custom input logic ─────
 
 const CHAR_PRESETS = [
-  { label: "Micro",    min: 50,  max: 150  },
-  { label: "Short",    min: 100, max: 300  },
-  { label: "Medium",   min: 200, max: 500  },
-  { label: "Long",     min: 400, max: 800  },
-  { label: "Extended", min: 600, max: 1200 },
+  { label: "Micro",  min: 50,  max: 150 },
+  { label: "Short",  min: 100, max: 300 },
+  { label: "Medium", min: 200, max: 500 },
+  { label: "Long",   min: 400, max: 800 },
 ];
 
 let isCustomMode = false;

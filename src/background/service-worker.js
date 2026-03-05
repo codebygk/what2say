@@ -194,6 +194,48 @@ function clearBadge() {
   chrome.action.setTitle({ title: "Way2Say" });
 }
 
+// ── Call Provider ─────────────────────────────
+
+async function callProvider(messages, settings) {
+  const provider = PROVIDERS[settings.provider];
+  if (!provider) throw new Error(`Unknown provider: ${settings.provider}`);
+
+  const req = provider.buildRequest({
+    messages,
+    model:   settings.model,
+    apiKey:  settings.apiKey,
+    baseUrl: settings.baseUrl ?? "http://localhost:11434",
+  });
+
+  const timeoutMs = (settings.timeoutSecs ?? 60) * 1000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(req.url, {
+      method:  "POST",
+      headers: req.headers,
+      body:    req.body,
+      signal:  controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      throw new Error(`${provider.name} error ${res.status}: ${errBody.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const text = provider.parseResponse(data);
+    if (!text) throw new Error(`${provider.name} returned an empty response.`);
+    return text;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") throw new Error(`Request timed out after ${settings.timeoutSecs}s.`);
+    throw err;
+  }
+}
+
 // ── Generation ────────────────────────────────
 
 async function handleGenerateRequest(postText) {
@@ -216,7 +258,9 @@ async function handleGenerateRequest(postText) {
 
   try {
     let comment = await callProvider(messages, settings);
+    console.log(`[Way2Say] Raw comment length: ${comment.length}, limits: ${minChars}–${maxChars}`);
     comment = await enforceCharLimits(comment, minChars, maxChars, messages, settings);
+    console.log(`[Way2Say] Final comment length: ${comment.length}`);
     clearBadge();
     return { ok: true, comment, provider: settings.provider, model: settings.model };
   } catch (err) {
@@ -226,59 +270,65 @@ async function handleGenerateRequest(postText) {
 }
 
 // ── Char Limit Enforcement ────────────────────
+// Rule: code enforces max unconditionally. Model is never trusted for length.
 
-function hardTrimToMax(text, maxChars) {
+function trimToMax(text, maxChars) {
   if (text.length <= maxChars) return text;
 
-  const trimmed = text.slice(0, maxChars);
+  const slice = text.slice(0, maxChars);
 
-  // Try to cut at last sentence boundary
-  const lastPeriod = Math.max(
-    trimmed.lastIndexOf(". "),
-    trimmed.lastIndexOf("! "),
-    trimmed.lastIndexOf("? ")
+  // Try sentence boundary (must be in the latter 60% to be worth using)
+  const sentenceEnd = Math.max(
+    slice.lastIndexOf(". "),
+    slice.lastIndexOf("! "),
+    slice.lastIndexOf("? "),
+    slice.lastIndexOf(".\n"),
   );
-  if (lastPeriod > maxChars * 0.5) {
-    return trimmed.slice(0, lastPeriod + 1).trim();
+  if (sentenceEnd > maxChars * 0.6) {
+    const cut = text.slice(0, sentenceEnd + 1).trim();
+    // Only use if trim didn't somehow push over (trim never adds chars, but be safe)
+    if (cut.length <= maxChars) return cut;
   }
 
-  // Fall back to last word boundary
-  const lastSpace = trimmed.lastIndexOf(" ");
-  if (lastSpace > maxChars * 0.5) {
-    return trimmed.slice(0, lastSpace).trim();
+  // Word boundary
+  const wordEnd = slice.lastIndexOf(" ");
+  if (wordEnd > maxChars * 0.6) {
+    const cut = text.slice(0, wordEnd).trim();
+    if (cut.length <= maxChars) return cut;
   }
 
-  return trimmed.trim();
+  // Hard cut — guaranteed
+  return text.slice(0, maxChars);
 }
 
 async function enforceCharLimits(comment, minChars, maxChars, messages, settings, attempt = 1) {
   const MAX_ATTEMPTS = 3;
 
-  // Always hard trim first if over max
-  if (maxChars && comment.length > maxChars) {
-    comment = hardTrimToMax(comment, maxChars);
+  // STEP 1: Hard trim to max — always, unconditionally
+  if (comment.length > maxChars) {
+    comment = trimToMax(comment, maxChars);
+    // Safety net: if still over (shouldn't happen), force slice
+    if (comment.length > maxChars) comment = comment.slice(0, maxChars);
   }
 
-  // If still over max after trim (edge case), force slice
-  if (maxChars && comment.length > maxChars) {
-    comment = comment.slice(0, maxChars).trim();
-  }
-
-  // Retry if under min
-  if (minChars && comment.length < minChars && attempt <= MAX_ATTEMPTS) {
+  // STEP 2: If under min, retry with model
+  if (comment.length < minChars && attempt <= MAX_ATTEMPTS) {
+    console.log(`[Way2Say] Under min (${comment.length}/${minChars}), retry ${attempt}`);
     const retryMessages = [
       ...messages,
       { role: "assistant", content: comment },
       {
         role: "user",
-        content: `That comment is only ${comment.length} characters. It must be at least ${minChars} characters and no more than ${maxChars} characters. Expand it. Output ONLY the comment text, nothing else.`,
+        content: `Too short at ${comment.length} chars. Rewrite the comment to be between ${minChars} and ${maxChars} characters. Output ONLY the comment text, nothing else.`,
       },
     ];
     try {
       let expanded = await callProvider(retryMessages, settings);
-      // Trim the retry result too if it comes back over max
-      if (maxChars && expanded.length > maxChars) {
-        expanded = hardTrimToMax(expanded, maxChars);
+      console.log(`[Way2Say] Retry ${attempt} returned ${expanded.length} chars`);
+      // Trim retry result before recursing
+      if (expanded.length > maxChars) {
+        expanded = trimToMax(expanded, maxChars);
+        if (expanded.length > maxChars) expanded = expanded.slice(0, maxChars);
       }
       return enforceCharLimits(expanded, minChars, maxChars, messages, settings, attempt + 1);
     } catch {
@@ -286,10 +336,15 @@ async function enforceCharLimits(comment, minChars, maxChars, messages, settings
     }
   }
 
+  // STEP 3: Final guaranteed clamp — runs no matter what
+  if (comment.length > maxChars) comment = comment.slice(0, maxChars);
+
+  console.log(`[Way2Say] enforceCharLimits done: ${comment.length} chars (limit ${minChars}–${maxChars})`);
   return comment;
 }
 
 // ── Prompt Builder ────────────────────────────
+// Keep prompt simple — code handles the actual enforcement.
 
 function buildPrompt({ postText, tone, persona, minChars, maxChars }) {
   const toneDesc = TONES[tone] ?? TONES.professional;
@@ -302,13 +357,8 @@ function buildPrompt({ postText, tone, persona, minChars, maxChars }) {
     personaLine,
     "Write a single comment replying to the social media post below.",
     "Tone: " + toneDesc + ".",
-    "STRICT CHARACTER LIMIT RULES — YOU MUST FOLLOW THESE:",
-    `  - Your response MUST be AT LEAST ${minChars} characters long.`,
-    `  - Your response MUST be NO MORE THAN ${maxChars} characters long.`,
-    `  - Target length: ${minChars}–${maxChars} characters. This is non-negotiable.`,
-    "  - Count characters carefully before responding.",
-    "  - If you are over the limit, shorten. If under, expand. Do not exceed " + maxChars + " characters under any circumstance.",
-    "OTHER RULES:",
+    "Rules:",
+    `  - Length: ${minChars} to ${maxChars} characters.`,
     "  - Output ONLY the comment text. No labels, no quotes, no preamble.",
     "  - Never start with 'Great post!' or hollow openers.",
     "  - Be specific to the content.",

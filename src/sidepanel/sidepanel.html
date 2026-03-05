@@ -353,6 +353,7 @@
     .field-row { display: flex; flex-direction: column; gap: 4px; }
     .field-label {
       font-size: 10px; font-weight: 600;
+      margin: 0 20px;
       color: var(--text-secondary);
       text-transform: uppercase; letter-spacing: 0.5px;
     }
@@ -417,6 +418,7 @@
       cursor: pointer; transition: opacity 0.15s;
     }
     .save-btn-sm:hover { opacity: 0.85; }
+    .save-btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* Main form fields */
     .form-section { padding: 10px 14px 0; display: flex; flex-direction: column; gap: 12px; }
@@ -519,7 +521,7 @@
     .upgrade-hint { font-size: 10px; color: var(--warning); font-weight: 600; }
 
     .char-limit-row { display: flex; flex-direction: column; gap: 4px; }
-    .char-limit-header { display: flex; align-items: center; justify-content: space-between; }
+    .char-limit-header { display: flex; align-items: center; justify-content: end; }
     .char-limit-label {
       font-size: 10px; font-weight: 600; color: var(--text-secondary);
       text-transform: uppercase; letter-spacing: 0.5px;
@@ -770,7 +772,7 @@
 
           <div class="save-provider-row">
             <span class="provider-status" id="provider-status"></span>
-            <button class="save-btn-sm" id="save-provider-btn">Save Provider</button>
+            <button class="save-btn-sm" id="save-provider-btn" disabled>Save Provider</button>
           </div>
         </div>
       </div>
@@ -807,7 +809,6 @@
               <button class="char-badge" data-min="100" data-max="300">Short</button>
               <button class="char-badge active" data-min="200" data-max="500">Medium</button>
               <button class="char-badge" data-min="400" data-max="800">Long</button>
-              <button class="char-badge" data-min="600" data-max="1200">Extended</button>
               <button class="char-badge custom" data-min="" data-max="">Custom</button>
             </div>
             <div class="char-custom-inputs">
@@ -848,8 +849,7 @@
           <label>Request Timeout</label>
           <div class="char-limit-row">
             <div class="char-limit-header">
-              <span class="char-limit-label">Seconds</span>
-              <span class="char-limit-val" id="timeout-display">60s</span>
+              <span class="char-limit-val" id="timeout-display">60 s</span>
             </div>
             <input type="range" class="char-slider" id="timeout-slider" min="10" max="120" step="5" value="60" />
           </div>
