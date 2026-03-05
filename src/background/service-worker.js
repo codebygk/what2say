@@ -1,42 +1,41 @@
 // ─────────────────────────────────────────────
 //  Way2Say — Service Worker
 //  Supports: OpenAI, Anthropic, Gemini, Groq, Ollama
-//  Self-contained, no imports.
 // ─────────────────────────────────────────────
 
 // ── Constants ─────────────────────────────────
 const GENERATE_MENU_ID = "way2say-generate";
-const NOTIF_ID = "way2say-notif";
 const OLLAMA_TIMEOUT_MS = 60_000;
 const CLOUD_TIMEOUT_MS = 30_000;
 
-const FREE_CHAR_LIMIT = 300;
+const FREE_MIN_CHAR_LIMIT = 100;
+const FREE_MAX_CHAR_LIMIT = 300;
 const FREE_TONE = "professional";
 const CACHE_DAYS = 7;
 const LICENSE_API =
   "https://way2say-license.gopalakrishnan-work-203.workers.dev";
+const PANEL_PATH = "src/sidepanel/sidepanel.html";
 
 const DEFAULT_SETTINGS = {
-  provider: "ollama",
-  model: "llama3:8b",
-  apiKey: "",
-  baseUrl: "http://localhost:11434",
-  tone: "professional",
-  persona: "",
-  charLimit: 1000,
+  provider:     "ollama",
+  model:        "llama3:8b",
+  apiKey:       "",
+  baseUrl:      "http://localhost:11434",
+  tone:         "professional",
+  persona:      "",
+  minCharLimit: 200,
+  maxCharLimit: 1000,
 };
 
 const TONES = {
   professional: "professional and insightful",
-  friendly: "warm and friendly",
-  witty: "clever and witty",
-  concise: "brief and to the point",
-  supportive: "encouraging and supportive",
+  friendly:     "warm and friendly",
+  witty:        "clever and witty",
+  concise:      "brief and to the point",
+  supportive:   "encouraging and supportive",
 };
 
 // ── Provider Definitions ──────────────────────
-// Each provider exposes a buildRequest() and parseResponse()
-// so adding a new provider is just adding a new entry here.
 
 const PROVIDERS = {
   openai: {
@@ -61,7 +60,6 @@ const PROVIDERS = {
     name: "Anthropic",
     timeout: CLOUD_TIMEOUT_MS,
     buildRequest({ messages, model, apiKey }) {
-      // Anthropic separates system prompt from messages
       const system = messages.find((m) => m.role === "system")?.content ?? "";
       const userMsgs = messages.filter((m) => m.role !== "system");
       return {
@@ -91,10 +89,7 @@ const PROVIDERS = {
       const system = messages.find((m) => m.role === "system")?.content ?? "";
       const userMsg = messages
         .filter((m) => m.role === "user")
-        .map((m) => ({
-          role: "user",
-          parts: [{ text: m.content }],
-        }));
+        .map((m) => ({ role: "user", parts: [{ text: m.content }] }));
       return {
         url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         headers: { "Content-Type": "application/json" },
@@ -123,7 +118,6 @@ const PROVIDERS = {
       };
     },
     parseResponse(data) {
-      // Same shape as OpenAI
       return data?.choices?.[0]?.message?.content?.trim() ?? "";
     },
   },
@@ -146,10 +140,7 @@ const PROVIDERS = {
 
 // ── Setup ─────────────────────────────────────
 
-chrome.runtime.onInstalled.addListener(registerContextMenu);
-chrome.runtime.onStartup.addListener(registerContextMenu);
-
-function registerContextMenu() {
+chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: GENERATE_MENU_ID,
@@ -157,150 +148,167 @@ function registerContextMenu() {
       contexts: ["selection"],
     });
   });
-}
+  chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch(console.error);
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  chrome.sidePanel
+    .setPanelBehavior({ openPanelOnActionClick: true })
+    .catch(console.error);
+});
 
 // ── Context Menu Click ────────────────────────
 
 chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId !== GENERATE_MENU_ID) return;
   const text = info.selectionText?.trim();
-  if (!text) {
-    notifyError("No text selected.");
-    return;
-  }
-  generateAndCopy(text);
+  if (!text) return;
+
+  chrome.storage.session.set({ pendingGenerate: text }, () => {
+    chrome.action.setBadgeText({ text: "⏳" });
+    chrome.action.setBadgeBackgroundColor({ color: "#4f6ef7" });
+    chrome.action.setTitle({ title: "Way2Say — Click icon to generate" });
+  });
 });
 
 // ── Message Handler ───────────────────────────
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === "LIST_MODELS") {
-    listOllamaModels().then((models) => sendResponse({ models }));
+    listOllamaModels(message.baseUrl).then((models) => sendResponse({ models }));
+    return true;
+  }
+
+  if (message.type === "GENERATE_IN_BG") {
+    handleGenerateRequest(message.text).then((result) => sendResponse(result));
     return true;
   }
 });
 
-// ── Core Pipeline ─────────────────────────────
+// ── Badge Helpers ─────────────────────────────
 
-async function generateAndCopy(postText) {
+function clearBadge() {
+  chrome.action.setBadgeText({ text: "" });
+  chrome.action.setTitle({ title: "Way2Say" });
+}
+
+// ── Generation ────────────────────────────────
+
+async function handleGenerateRequest(postText) {
+  chrome.action.setBadgeText({ text: "..." });
+  chrome.action.setBadgeBackgroundColor({ color: "#4f6ef7" });
+
   const [settings, isPro] = await Promise.all([loadSettings(), checkLicense()]);
 
-  // Enforce free tier limits
-  const tone = isPro ? settings.tone : FREE_TONE;
-  const charLimit = isPro ? settings.charLimit : FREE_CHAR_LIMIT;
-
-  showGeneratingNotification();
-  await sleep(150);
+  const tone     = isPro ? settings.tone        : FREE_TONE;
+  const minChars = isPro ? settings.minCharLimit : FREE_MIN_CHAR_LIMIT;
+  const maxChars = isPro ? settings.maxCharLimit : FREE_MAX_CHAR_LIMIT;
 
   const messages = buildPrompt({
     postText,
     tone,
     persona: isPro ? settings.persona : "",
-    charLimit,
+    minChars,
+    maxChars,
   });
 
-  let comment;
   try {
-    comment = await callProvider(messages, settings);
+    let comment = await callProvider(messages, settings);
+    comment = await enforceCharLimits(comment, minChars, maxChars, messages, settings);
+    clearBadge();
+    return { ok: true, comment, provider: settings.provider, model: settings.model };
   } catch (err) {
-    console.error("[Way2Say] Provider error:", err);
-    notifyError(err.message);
-    return;
+    clearBadge();
+    return { ok: false, error: err.message };
   }
-
-  try {
-    await writeToClipboard(comment);
-  } catch (err) {
-    console.error("[Way2Say] Clipboard error:", err);
-    notifyError("Clipboard write failed: " + err.message);
-    return;
-  }
-
-  notifySuccess(comment);
 }
 
-// ── Provider Router ───────────────────────────
+// ── Char Limit Enforcement ────────────────────
 
-async function callProvider(messages, settings) {
-  const provider = PROVIDERS[settings.provider];
-  if (!provider) throw new Error(`Unknown provider: ${settings.provider}`);
+function hardTrimToMax(text, maxChars) {
+  if (text.length <= maxChars) return text;
 
-  const reqArgs = {
-    messages,
-    model: settings.model,
-    apiKey: settings.apiKey,
-    baseUrl: settings.baseUrl || "http://localhost:11434",
-  };
+  const trimmed = text.slice(0, maxChars);
 
-  const { url, headers, body } = provider.buildRequest(reqArgs);
+  // Try to cut at last sentence boundary
+  const lastPeriod = Math.max(
+    trimmed.lastIndexOf(". "),
+    trimmed.lastIndexOf("! "),
+    trimmed.lastIndexOf("? ")
+  );
+  if (lastPeriod > maxChars * 0.5) {
+    return trimmed.slice(0, lastPeriod + 1).trim();
+  }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), provider.timeout);
+  // Fall back to last word boundary
+  const lastSpace = trimmed.lastIndexOf(" ");
+  if (lastSpace > maxChars * 0.5) {
+    return trimmed.slice(0, lastSpace).trim();
+  }
 
-  let response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers,
-      body,
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timer);
-    if (err.name === "AbortError") {
-      throw new Error(
-        `${provider.name} timed out. Check your connection or try a smaller model.`,
-      );
+  return trimmed.trim();
+}
+
+async function enforceCharLimits(comment, minChars, maxChars, messages, settings, attempt = 1) {
+  const MAX_ATTEMPTS = 3;
+
+  // Always hard trim first if over max
+  if (maxChars && comment.length > maxChars) {
+    comment = hardTrimToMax(comment, maxChars);
+  }
+
+  // If still over max after trim (edge case), force slice
+  if (maxChars && comment.length > maxChars) {
+    comment = comment.slice(0, maxChars).trim();
+  }
+
+  // Retry if under min
+  if (minChars && comment.length < minChars && attempt <= MAX_ATTEMPTS) {
+    const retryMessages = [
+      ...messages,
+      { role: "assistant", content: comment },
+      {
+        role: "user",
+        content: `That comment is only ${comment.length} characters. It must be at least ${minChars} characters and no more than ${maxChars} characters. Expand it. Output ONLY the comment text, nothing else.`,
+      },
+    ];
+    try {
+      let expanded = await callProvider(retryMessages, settings);
+      // Trim the retry result too if it comes back over max
+      if (maxChars && expanded.length > maxChars) {
+        expanded = hardTrimToMax(expanded, maxChars);
+      }
+      return enforceCharLimits(expanded, minChars, maxChars, messages, settings, attempt + 1);
+    } catch {
+      return comment;
     }
-    if (settings.provider === "ollama") {
-      throw new Error(
-        "Cannot reach Ollama. Run: OLLAMA_ORIGINS=* ollama serve",
-      );
-    }
-    throw new Error(
-      `Cannot reach ${provider.name}. Check your API key and connection.`,
-    );
   }
 
-  clearTimeout(timer);
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    let hint = "";
-    if (response.status === 401) hint = " — Invalid API key.";
-    if (response.status === 429) hint = " — Rate limit exceeded.";
-    if (response.status === 404) hint = " — Model not found.";
-    throw new Error(`${provider.name} error ${response.status}${hint}`);
-  }
-
-  let data;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error(`${provider.name} returned invalid JSON.`);
-  }
-
-  const content = provider.parseResponse(data);
-  if (!content) throw new Error(`${provider.name} returned an empty response.`);
-
-  return content;
+  return comment;
 }
 
 // ── Prompt Builder ────────────────────────────
 
-function buildPrompt({ postText, tone, persona, charLimit }) {
+function buildPrompt({ postText, tone, persona, minChars, maxChars }) {
   const toneDesc = TONES[tone] ?? TONES.professional;
   const personaLine =
     persona && persona.trim()
-      ? "You are writing as: " + persona.trim() + "."
+      ? "You are writing with a strong personality of: " + persona.trim() + "."
       : "You are a thoughtful professional engaging with content online.";
 
   const system = [
     personaLine,
     "Write a single comment replying to the social media post below.",
     "Tone: " + toneDesc + ".",
-    "Rules:",
-    "  - Maximum " + charLimit + " characters.",
+    "STRICT CHARACTER LIMIT RULES — YOU MUST FOLLOW THESE:",
+    `  - Your response MUST be AT LEAST ${minChars} characters long.`,
+    `  - Your response MUST be NO MORE THAN ${maxChars} characters long.`,
+    `  - Target length: ${minChars}–${maxChars} characters. This is non-negotiable.`,
+    "  - Count characters carefully before responding.",
+    "  - If you are over the limit, shorten. If under, expand. Do not exceed " + maxChars + " characters under any circumstance.",
+    "OTHER RULES:",
     "  - Output ONLY the comment text. No labels, no quotes, no preamble.",
     "  - Never start with 'Great post!' or hollow openers.",
     "  - Be specific to the content.",
@@ -337,17 +345,13 @@ async function checkLicense() {
     chrome.storage.local.get(
       { licenseCache: null },
       async ({ licenseCache }) => {
-        if (!licenseCache?.key) {
-          resolve(false);
-          return;
-        }
+        if (!licenseCache?.key) { resolve(false); return; }
         const daysSince =
           (Date.now() - (licenseCache.lastValidated ?? 0)) / 86_400_000;
         if (daysSince < CACHE_DAYS) {
           resolve(licenseCache.plan === "pro");
           return;
         }
-        // Re-validate
         try {
           const res = await fetch(`${LICENSE_API}/validate`, {
             method: "POST",
@@ -361,8 +365,8 @@ async function checkLicense() {
           resolve(data.valid === true);
         } catch {
           resolve(true);
-        } // grace period on network failure
-      },
+        }
+      }
     );
   });
 }
@@ -371,98 +375,8 @@ async function checkLicense() {
 
 function loadSettings() {
   return new Promise((resolve) =>
-    chrome.storage.sync.get(DEFAULT_SETTINGS, resolve),
+    chrome.storage.sync.get(DEFAULT_SETTINGS, resolve)
   );
-}
-
-// ── Clipboard ─────────────────────────────────
-
-async function writeToClipboard(text) {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const isSafeTab =
-    tab?.id &&
-    tab.url &&
-    !tab.url.startsWith("chrome://") &&
-    !tab.url.startsWith("chrome-extension://") &&
-    !tab.url.startsWith("edge://") &&
-    !tab.url.startsWith("about:");
-
-  if (isSafeTab) {
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: (t) => {
-        try {
-          const el = document.createElement("textarea");
-          el.value = t;
-          el.style.cssText =
-            "position:fixed;top:0;left:0;opacity:0;pointer-events:none;";
-          document.body.appendChild(el);
-          el.focus();
-          el.select();
-          const ok = document.execCommand("copy");
-          document.body.removeChild(el);
-          if (!ok) throw new Error("execCommand failed");
-        } catch {
-          return navigator.clipboard.writeText(t);
-        }
-      },
-      args: [text],
-    });
-    return;
-  }
-  await copyViaOffscreen(text);
-}
-
-async function copyViaOffscreen(text) {
-  const hasDoc = await chrome.offscreen.hasDocument?.().catch(() => false);
-  if (!hasDoc) {
-    await chrome.offscreen.createDocument({
-      url: "offscreen.html",
-      reasons: ["CLIPBOARD"],
-      justification: "Write comment to clipboard",
-    });
-  }
-  await chrome.runtime.sendMessage({ type: "COPY_TO_CLIPBOARD", text });
-  await chrome.offscreen.closeDocument().catch(() => {});
-}
-
-// ── Notifications ─────────────────────────────
-
-function showGeneratingNotification() {
-  chrome.notifications.clear(NOTIF_ID, () => {
-    chrome.notifications.create(NOTIF_ID, {
-      type: "basic",
-      iconUrl: chrome.runtime.getURL("icons/icon48.png"),
-      title: "Way2Say",
-      message: "⏳ Generating comment…",
-      priority: 2,
-    });
-  });
-}
-
-function notifySuccess(text) {
-  const preview = text.length > 60 ? text.slice(0, 60) + "…" : text;
-  chrome.notifications.clear(NOTIF_ID, () => {
-    chrome.notifications.create(NOTIF_ID, {
-      type: "basic",
-      iconUrl: chrome.runtime.getURL("icons/icon48.png"),
-      title: "Way2Say ✓",
-      message: '📋 Copied! "' + preview + '"',
-      priority: 1,
-    });
-  });
-}
-
-function notifyError(msg) {
-  chrome.notifications.clear(NOTIF_ID, () => {
-    chrome.notifications.create(NOTIF_ID, {
-      type: "basic",
-      iconUrl: chrome.runtime.getURL("icons/icon48.png"),
-      title: "Way2Say — Error",
-      message: "❌ " + msg,
-      priority: 2,
-    });
-  });
 }
 
 // ── Utility ───────────────────────────────────

@@ -20,15 +20,18 @@ export function buildCommentPrompt({ postText, tone, persona, charLimit }) {
 
   const personaLine =
     persona && persona.trim()
-      ? `You are writing as a personal with a strong personality of: ${persona.trim()}.`
+      ? `You are writing as a person with a strong personality of: ${persona.trim()}.`
       : "You are a thoughtful professional engaging with content online.";
+
+  const minChars = Math.max(50, charLimit - 100);
 
   const systemLines = [
     personaLine,
     "Your task is to write a single comment replying to the social media post below.",
     `Tone: ${toneDescription}.`,
     "Rules:",
-    `  - Maximum ${charLimit} characters.`,
+    `  - Your response MUST be at least ${minChars} characters long.`,
+    `  - If your response is under ${minChars} characters, expand it before responding.`,
     "  - Output ONLY the comment text. No labels, no quotes, no preamble.",
     "  - Never start with 'Great post!' or similar hollow openers.",
     "  - Be specific to the content — avoid vague generalities.",
@@ -36,15 +39,7 @@ export function buildCommentPrompt({ postText, tone, persona, charLimit }) {
   ];
 
   const system = systemLines.join("\n");
-
-  const user = [
-    "Post:",
-    '"""',
-    postText.trim(),
-    '"""',
-    "",
-    "Write a comment:",
-  ].join("\n");
+  const user = ["Post:", '"""', postText.trim(), '"""', "", "Write a comment:"].join("\n");
 
   return [
     { role: "system", content: system },
