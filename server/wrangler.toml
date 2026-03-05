@@ -14,8 +14,3 @@ compatibility_date = "2026-03-04"
 binding = "LICENSES"
 id = "2561e5495dc64825978189d277205d3c"
 
-# Environment variables
-# Set the real secret with:
-#   npx wrangler secret put LEMON_SQUEEZY_WEBHOOK_SECRET
-[vars]
-LEMON_SQUEEZY_WEBHOOK_SECRET = "set-via-wrangler-secret"

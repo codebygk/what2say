@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-//  AI Commenter — License Validation Worker
+//  Way2Say — License Validation Worker
 //  Cloudflare Worker — single file, zero deps
 //
 //  Routes:
@@ -14,22 +14,26 @@ const LS_WEBHOOK_SECRET  = "LEMON_SQUEEZY_WEBHOOK_SECRET"; // set in wrangler.to
 
 export default {
   async fetch(request, env) {
-    // ── CORS headers (required for extension fetch calls) ──
-    const cors = {
-      "Access-Control-Allow-Origin":  "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
+    const origin = request.headers.get("Origin") || "*";
 
+    // Handle preflight — Chrome extensions send OPTIONS before POST
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: cors });
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin":  "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Max-Age":       "86400",
+        },
+      });
     }
 
     const url = new URL(request.url);
     let response;
 
     try {
-      if (url.pathname === "/validate"   && request.method === "POST") response = await handleValidate(request, env);
+      if      (url.pathname === "/validate"   && request.method === "POST") response = await handleValidate(request, env);
       else if (url.pathname === "/webhook"    && request.method === "POST") response = await handleWebhook(request, env);
       else if (url.pathname === "/deactivate" && request.method === "POST") response = await handleDeactivate(request, env);
       else response = json({ error: "Not found" }, 404);
@@ -38,9 +42,12 @@ export default {
       response = json({ error: "Internal server error" }, 500);
     }
 
-    // Attach CORS headers to every response
-    Object.entries(cors).forEach(([k, v]) => response.headers.set(k, v));
-    return response;
+    // Attach CORS to every response — must clone since headers may be immutable
+    const corsResponse = new Response(response.body, response);
+    corsResponse.headers.set("Access-Control-Allow-Origin", "*");
+    corsResponse.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    corsResponse.headers.set("Access-Control-Allow-Headers", "Content-Type");
+    return corsResponse;
   },
 };
 
@@ -105,36 +112,82 @@ async function handleWebhook(request, env) {
   const eventName = event?.meta?.event_name;
 
   // Handle the events we care about
-  if (eventName === "order_created") {
-    await handleOrderCreated(event, env);
-  } else if (eventName === "license_key_updated") {
-    await handleLicenseUpdated(event, env);
-  }
+  console.log("[Way2Say] Webhook received:", eventName);
+
+  if      (eventName === "order_created")       await handleOrderCreated(event, env);
+  else if (eventName === "license_key_created") await handleLicenseKeyCreated(event, env);
+  else if (eventName === "license_key_updated") await handleLicenseUpdated(event, env);
+  else    console.log("[Way2Say] Unhandled event:", eventName);
 
   return json({ received: true });
 }
 
 async function handleOrderCreated(event, env) {
-  const key      = event?.data?.attributes?.license_key?.key;
-  const email    = event?.data?.attributes?.user_email;
-  const planName = event?.data?.attributes?.variant_name ?? "pro";
+  // Log full payload so we can debug field paths in wrangler tail
+  console.log("[Way2Say] order_created payload:", JSON.stringify(event, null, 2));
+
+  // Lemon Squeezy payload structure (as of 2024):
+  // order_created fires once per order — but does NOT include license keys.
+  // License keys come via the separate `license_key_created` event.
+  // We handle both here defensively.
+
+  // Path 1: order_created with nested license key (older LS versions)
+  let key   = event?.data?.attributes?.license_key?.key
+           ?? event?.data?.attributes?.first_order_item?.license_key
+           ?? null;
+  let email = event?.data?.attributes?.user_email
+           ?? event?.data?.attributes?.user?.data?.attributes?.email
+           ?? null;
+  const planName = event?.data?.attributes?.variant_name
+                ?? event?.data?.attributes?.first_order_item?.variant_name
+                ?? "pro";
+
+  if (key) {
+    await saveLicense(env, key.trim(), {
+      email,
+      plan:      "pro",
+      devices:   [],
+      seatLimit: SEAT_LIMIT,
+      revoked:   false,
+      createdAt: Date.now(),
+      expiresAt: null,
+    });
+    console.log(`[Way2Say] License created (order_created) for ${email}: ${key}`);
+  } else {
+    console.log("[Way2Say] No license key in order_created — waiting for license_key_created event");
+  }
+}
+
+// Handles the `license_key_created` event — fires separately from order_created
+async function handleLicenseKeyCreated(event, env) {
+  console.log("[Way2Say] license_key_created payload:", JSON.stringify(event, null, 2));
+
+  // LS license_key_created payload structure:
+  // event.data.attributes.key         — the license key string
+  // event.data.attributes.status      — "active" | "inactive" etc
+  // event.data.attributes.order_id    — linked order
+  // event.meta.custom_data            — any custom data you passed at checkout
+  const key   = event?.data?.attributes?.key;
+  const email = event?.meta?.custom_data?.email
+             ?? event?.data?.attributes?.user_email
+             ?? "unknown";
 
   if (!key) {
-    console.error("No license key in order_created payload");
+    console.error("[Way2Say] No key in license_key_created payload");
     return;
   }
 
-  await saveLicense(env, key, {
+  await saveLicense(env, key.trim(), {
     email,
-    plan:      planName.toLowerCase(),
+    plan:      "pro",
     devices:   [],
     seatLimit: SEAT_LIMIT,
     revoked:   false,
     createdAt: Date.now(),
-    expiresAt: null, // null = lifetime, set a timestamp for subscriptions
+    expiresAt: null,
   });
 
-  console.log(`License created for ${email}: ${key}`);
+  console.log(`[Way2Say] License inserted (license_key_created): ${key}`);
 }
 
 async function handleLicenseUpdated(event, env) {
