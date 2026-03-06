@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────
-//  License Client — add this to your extension
+//  License Client - add this to your extension
 //  Place at: src/shared/license.js
 //
 //  Used by both service-worker.js and popup.js
 // ─────────────────────────────────────────────
 
 const LICENSE_API =
-  "https://way2say-license.gopalakrishnan-work-203.workers.dev";
+  "https://zapcomment-license.gopalakrishnan-work-203.workers.dev";
 const CACHE_DAYS = 7; // days before re-validating with server
 const MS_PER_DAY = 86_400_000;
 
@@ -64,12 +64,12 @@ export async function checkLicense() {
 
   const daysSince = (Date.now() - (cache.lastValidated ?? 0)) / MS_PER_DAY;
 
-  // Within cache window — trust local result
+  // Within cache window - trust local result
   if (daysSince < CACHE_DAYS) {
     return cache.plan === "pro";
   }
 
-  // Cache expired — re-validate with server
+  // Cache expired - re-validate with server
   const result = await activateLicense(cache.key);
   return result.ok && result.plan === "pro";
 }
@@ -89,7 +89,7 @@ export async function deactivateLicense() {
       body: JSON.stringify({ key: cache.key, deviceId: cache.deviceId }),
     });
   } catch {
-    // Best effort — clear locally regardless
+    // Best effort - clear locally regardless
   }
 
   await clearLicenseCache();

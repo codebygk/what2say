@@ -1,64 +1,8 @@
 // ─────────────────────────────────────────────
-//  Way2Say — Side Panel (Generate + Settings)
+//  ZapComment - Side Panel (Generate + Settings)
 // ─────────────────────────────────────────────
 
-const LICENSE_API = "https://way2say-license.gopalakrishnan-work-203.workers.dev";
-const CACHE_DAYS  = 7;
-
-const DEFAULT_SETTINGS = {
-  provider:     "ollama",
-  model:        "llama3:8b",
-  apiKey:       "",
-  baseUrl:      "http://localhost:11434",
-  tone:         "professional",
-  persona:      "",
-  minCharLimit: 200,
-  maxCharLimit: 1000,
-  timeoutSecs:  60,
-};
-
-const PROVIDER_CONFIG = {
-  ollama: {
-    label: "Ollama (Local)",
-    fields: [
-      { key: "baseUrl", label: "Ollama URL", placeholder: "http://localhost:11434", type: "text" },
-      { key: "model",   label: "Model",      placeholder: "llama3:8b",              type: "select-or-text", dynamic: true },
-    ],
-    hint: 'Free &amp; local. Start: <code>OLLAMA_ORIGINS=* ollama serve</code>',
-  },
-  openai: {
-    label: "OpenAI",
-    fields: [
-      { key: "apiKey", label: "API Key", placeholder: "sk-…", type: "password" },
-      { key: "model",  label: "Model",   placeholder: "",      type: "select", options: ["gpt-4o","gpt-4o-mini","gpt-4","gpt-3.5-turbo"] },
-    ],
-    hint: 'Get key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>',
-  },
-  anthropic: {
-    label: "Claude (Anthropic)",
-    fields: [
-      { key: "apiKey", label: "API Key", placeholder: "sk-ant-…", type: "password" },
-      { key: "model",  label: "Model",   placeholder: "",           type: "select", options: ["claude-3-5-sonnet-20241022","claude-3-5-haiku-20241022","claude-3-opus-20240229"] },
-    ],
-    hint: 'Get key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>',
-  },
-  gemini: {
-    label: "Gemini (Google)",
-    fields: [
-      { key: "apiKey", label: "API Key", placeholder: "AIza…", type: "password" },
-      { key: "model",  label: "Model",   placeholder: "",        type: "select", options: ["gemini-2.0-flash-exp","gemini-1.5-pro","gemini-1.5-flash"] },
-    ],
-    hint: 'Get key at <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>',
-  },
-  groq: {
-    label: "Groq (Fast & Free)",
-    fields: [
-      { key: "apiKey", label: "API Key", placeholder: "gsk_…", type: "password" },
-      { key: "model",  label: "Model",   placeholder: "",        type: "select", options: ["llama-3.1-70b-versatile","llama-3.1-8b-instant","mixtral-8x7b-32768","gemma2-9b-it"] },
-    ],
-    hint: 'Free tier available. <a href="https://console.groq.com" target="_blank">console.groq.com</a>',
-  },
-};
+import { DEFAULT_SETTINGS, PROVIDER_CONFIG } from '../shared/constants.js';
 
 // ── Storage ───────────────────────────────────
 const loadSettings = ()    => new Promise(r => chrome.storage.sync.get(DEFAULT_SETTINGS, r));
@@ -67,7 +11,7 @@ const resetSettings = ()   => saveSettings(DEFAULT_SETTINGS);
 const loadLocal = defaults => new Promise(r => chrome.storage.local.get(defaults, r));
 const saveLocal = data     => new Promise(r => chrome.storage.local.set(data, r));
 
-// ── DOM — Generate tab ────────────────────────
+// ── DOM - Generate tab ────────────────────────
 const stateIdle          = document.getElementById("stateIdle");
 const stateGenerating    = document.getElementById("stateGenerating");
 const stateError         = document.getElementById("stateError");
@@ -90,7 +34,7 @@ const qcCustomRow        = document.getElementById("qcCustomRow");
 const qcMinInput         = document.getElementById("qcMinInput");
 const qcMaxInput         = document.getElementById("qcMaxInput");
 
-// ── DOM — Settings tab ────────────────────────
+// ── DOM - Settings tab ────────────────────────
 const tierBadge            = document.getElementById("tier-badge");
 const themeBtn             = document.getElementById("themeBtn");
 const providerHeader       = document.getElementById("provider-header");
@@ -196,13 +140,13 @@ async function startGenerate(text) {
   const settings = await loadSettings();
   generatingProvider.textContent = `${settings.provider} · ${settings.model}`;
 
-  // Resolve tone — "default" means use settings value (pass null = service worker uses settings)
+  // Resolve tone - "default" means use settings value (pass null = service worker uses settings)
   const activeTonePill = qcTonePills.querySelector(".qc-pill.active");
   const toneOverride   = (activeTonePill?.dataset.tone !== "default")
     ? activeTonePill?.dataset.tone ?? null
     : null;
 
-  // Resolve length — "default" = null (service worker uses settings), "custom" = inputs
+  // Resolve length - "default" = null (service worker uses settings), "custom" = inputs
   const activeLenPill = qcLengthPills.querySelector(".qc-pill.active");
   const lenPreset     = activeLenPill?.dataset.preset ?? "default";
   let minOverride = null, maxOverride = null;
@@ -220,7 +164,7 @@ async function startGenerate(text) {
     }
   }
 
-  console.log(`[Way2Say] Quick overrides — tone: ${toneOverride}, min: ${minOverride}, max: ${maxOverride}`);
+  console.log(`[ZapComment] Quick overrides - tone: ${toneOverride}, min: ${minOverride}, max: ${maxOverride}`);
 
   chrome.runtime.sendMessage({
     type:      "GENERATE_IN_BG",
@@ -240,11 +184,11 @@ async function startGenerate(text) {
       showGenerateState("result");
       resultTextarea.focus();
       // Auto-copy and update button text
-      copyBtn.textContent = "✓ Copied";
+      copyBtn.textContent = "Copied";
       copyBtn.className   = "btn success";
       await autoCopy(result.comment);
       setTimeout(() => {
-        copyBtn.textContent = "📋 Copy";
+        copyBtn.textContent = "Copy";
         copyBtn.className   = "btn primary";
       }, 2500);
     } else {
@@ -258,7 +202,7 @@ async function autoCopy(text) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    // Fallback — select + execCommand
+    // Fallback - select + execCommand
     resultTextarea.select();
     document.execCommand("copy");
   }
@@ -282,11 +226,11 @@ function updateCharCount() {
 copyBtn.addEventListener("click", async () => {
   const text = resultTextarea.value.trim();
   if (!text) return;
-  copyBtn.textContent = "✓ Copied!";
+  copyBtn.textContent = "Copied!";
   copyBtn.className   = "btn success";
   await autoCopy(text);
   setTimeout(() => {
-    copyBtn.textContent = "📋 Copy";
+    copyBtn.textContent = "Copy";
     copyBtn.className   = "btn primary";
   }, 2500);
 });
@@ -354,7 +298,7 @@ async function initProvider() {
   timeoutDisplay.textContent = timeoutSlider.value + "s";
   timeoutSlider.addEventListener("input", () => {
     timeoutDisplay.textContent = timeoutSlider.value + "s";
-    updateSaveProviderBtn();
+    updateSaveBtn();
   });
 }
 
@@ -400,7 +344,7 @@ function updateOllamaStatus(models) {
     statusText.textContent = `Connected · ${models.length} model${models.length !== 1 ? "s" : ""} available`;
   } else {
     ollamaStatus.className = "error";
-    statusText.textContent = "Ollama not reachable — is it running?";
+    statusText.textContent = "Ollama not reachable - is it running?";
   }
 }
 
@@ -454,7 +398,6 @@ function watchProviderFields() {
     el.addEventListener("input", updateSaveProviderBtn);
     el.addEventListener("change", updateSaveProviderBtn);
   });
-  timeoutSlider.addEventListener("input", updateSaveProviderBtn);
 }
 
 saveProviderBtn.addEventListener("click", async () => {
@@ -604,7 +547,7 @@ async function validateWithServer(key) {
 // ════════════════════════════════════════════
 
 function initQuickControls() {
-  // Tone pills — Default always resets to settings value
+  // Tone pills - Default always resets to settings value
   qcTonePills.querySelectorAll(".qc-pill").forEach(pill => {
     pill.addEventListener("click", () => {
       if (pill.disabled) return;
@@ -625,7 +568,7 @@ function initQuickControls() {
     });
   });
 
-  // Custom length inputs — clamp on change
+  // Custom length inputs - clamp on change
   qcMinInput.addEventListener("input", () => {
     let v = Number(qcMinInput.value);
     if (v < 0) qcMinInput.value = 0;
@@ -638,7 +581,7 @@ function initQuickControls() {
   });
 }
 
-// Called on load and after settings save — resets both to Default
+// Called on load and after settings save - resets both to Default
 function syncQuickControlsFromSettings() {
   // Always reset to Default on load
   qcTonePills.querySelectorAll(".qc-pill").forEach(p =>

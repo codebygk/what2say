@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-//  Storage — typed wrapper around chrome.storage.sync
+//  Storage - typed wrapper around chrome.storage.sync
 //  All reads/writes go through here so the rest
 //  of the code never touches the raw API.
 // ─────────────────────────────────────────────

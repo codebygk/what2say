@@ -1,20 +1,21 @@
 // ─────────────────────────────────────────────
-//  Way2Say — Service Worker
+//  ZapComment - Service Worker
 //  Supports: OpenAI, Anthropic, Gemini, Groq, Ollama
 // ─────────────────────────────────────────────
 
-// ── Constants ─────────────────────────────────
-const GENERATE_MENU_ID = "way2say-generate";
-const OLLAMA_TIMEOUT_MS = 60_000;
-const CLOUD_TIMEOUT_MS = 30_000;
-
-const FREE_MIN_CHAR_LIMIT = 100;
-const FREE_MAX_CHAR_LIMIT = 300;
-const FREE_TONE = "professional";
-const CACHE_DAYS = 7;
-const LICENSE_API =
-  "https://way2say-license.gopalakrishnan-work-203.workers.dev";
-const PANEL_PATH = "src/sidepanel/sidepanel.html";
+import {
+  GENERATE_MENU_ID,
+  OLLAMA_TIMEOUT_MS,
+  CLOUD_TIMEOUT_MS,
+  FREE_MIN_CHAR_LIMIT,
+  FREE_MAX_CHAR_LIMIT,
+  FREE_TONE,
+  DEFAULT_SETTINGS,
+  TONES,
+  LICENSE_API,
+  CACHE_DAYS,
+} from '../shared/constants.js';
+import { buildPrompt } from './prompt-builder.js';
 
 // ── Provider Definitions ──────────────────────
 
@@ -150,7 +151,7 @@ chrome.contextMenus.onClicked.addListener((info) => {
   chrome.storage.session.set({ pendingGenerate: text }, () => {
     chrome.action.setBadgeText({ text: "⏳" });
     chrome.action.setBadgeBackgroundColor({ color: "#4f6ef7" });
-    chrome.action.setTitle({ title: "Way2Say — Click icon to generate" });
+    chrome.action.setTitle({ title: "ZapComment - Click icon to generate" });
   });
 });
 
@@ -173,7 +174,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 function clearBadge() {
   chrome.action.setBadgeText({ text: "" });
-  chrome.action.setTitle({ title: "Way2Say" });
+  chrome.action.setTitle({ title: "ZapComment" });
 }
 
 // ── Call Provider ─────────────────────────────
@@ -184,8 +185,8 @@ async function callProvider(messages, settings) {
 
   const req = provider.buildRequest({
     messages,
-    model:   settings.model,
-    apiKey:  settings.apiKey,
+    model: settings.model,
+    apiKey: settings.apiKey,
     baseUrl: settings.baseUrl ?? "http://localhost:11434",
   });
 
@@ -195,10 +196,10 @@ async function callProvider(messages, settings) {
 
   try {
     const res = await fetch(req.url, {
-      method:  "POST",
+      method: "POST",
       headers: req.headers,
-      body:    req.body,
-      signal:  controller.signal,
+      body: req.body,
+      signal: controller.signal,
     });
     clearTimeout(timer);
 
@@ -226,24 +227,21 @@ async function handleGenerateRequest(postText, quickTone = null, quickMin = null
 
   const [settings, isPro] = await Promise.all([loadSettings(), checkLicense()]);
 
-  const tone     = isPro ? (quickTone ?? settings.tone) : FREE_TONE;
-  const minChars = isPro ? (quickMin  ?? settings.minCharLimit) : FREE_MIN_CHAR_LIMIT;
-  const maxChars = isPro ? (quickMax  ?? settings.maxCharLimit) : FREE_MAX_CHAR_LIMIT;
-  console.log(`[Way2Say] Generate — isPro:${isPro} tone:${tone} min:${minChars} max:${maxChars} (overrides: tone=${quickTone} min=${quickMin} max=${quickMax})`);
+  const tone = isPro ? (quickTone ?? settings.tone) : FREE_TONE;
+  const minChars = isPro ? (quickMin ?? settings.minCharLimit) : FREE_MIN_CHAR_LIMIT;
+  const maxChars = isPro ? (quickMax ?? settings.maxCharLimit) : FREE_MAX_CHAR_LIMIT;
 
   const messages = buildPrompt({
     postText,
     tone,
-    persona: isPro ? settings.persona : "",
+    persona: settings.persona,
     minChars,
     maxChars,
   });
 
   try {
     let comment = await callProvider(messages, settings);
-    console.log(`[Way2Say] Raw comment length: ${comment.length}, limits: ${minChars}-${maxChars}`);
     comment = await enforceCharLimits(comment, minChars, maxChars, messages, settings);
-    console.log(`[Way2Say] Final comment length: ${comment.length}`);
     clearBadge();
     return { ok: true, comment, provider: settings.provider, model: settings.model };
   } catch (err) {
@@ -280,14 +278,14 @@ function trimToMax(text, maxChars) {
     if (cut.length <= maxChars) return cut;
   }
 
-  // Hard cut — guaranteed
+  // Hard cut - guaranteed
   return text.slice(0, maxChars);
 }
 
 async function enforceCharLimits(comment, minChars, maxChars, messages, settings, attempt = 1) {
   const MAX_ATTEMPTS = 3;
 
-  // STEP 1: Hard trim to max — always, unconditionally
+  // STEP 1: Hard trim to max - always, unconditionally
   if (comment.length > maxChars) {
     comment = trimToMax(comment, maxChars);
     // Safety net: if still over (shouldn't happen), force slice
@@ -296,7 +294,7 @@ async function enforceCharLimits(comment, minChars, maxChars, messages, settings
 
   // STEP 2: If under min, retry with model
   if (comment.length < minChars && attempt <= MAX_ATTEMPTS) {
-    console.log(`[Way2Say] Under min (${comment.length}/${minChars}), retry ${attempt}`);
+    console.log(`[ZapComment] Under min (${comment.length}/${minChars}), retry ${attempt}`);
     const retryMessages = [
       ...messages,
       { role: "assistant", content: comment },
@@ -307,7 +305,7 @@ async function enforceCharLimits(comment, minChars, maxChars, messages, settings
     ];
     try {
       let expanded = await callProvider(retryMessages, settings);
-      console.log(`[Way2Say] Retry ${attempt} returned ${expanded.length} chars`);
+      console.log(`[ZapComment] Retry ${attempt} returned ${expanded.length} chars`);
       // Trim retry result before recursing
       if (expanded.length > maxChars) {
         expanded = trimToMax(expanded, maxChars);
@@ -319,41 +317,11 @@ async function enforceCharLimits(comment, minChars, maxChars, messages, settings
     }
   }
 
-  // STEP 3: Final guaranteed clamp — runs no matter what
+  // STEP 3: Final guaranteed clamp - runs no matter what
   if (comment.length > maxChars) comment = comment.slice(0, maxChars);
 
-  console.log(`[Way2Say] enforceCharLimits done: ${comment.length} chars (limit ${minChars}-${maxChars})`);
+  console.log(`[ZapComment] enforceCharLimits done: ${comment.length} chars (limit ${minChars}-${maxChars})`);
   return comment;
-}
-
-// ── Prompt Builder ────────────────────────────
-// Keep prompt simple — code handles the actual enforcement.
-
-function buildPrompt({ postText, tone, persona, minChars, maxChars }) {
-  const toneDesc = TONES[tone] ?? TONES.professional;
-  const personaLine =
-    persona && persona.trim()
-      ? "You are writing with a strong personality of: " + persona.trim() + "."
-      : "You are a thoughtful professional engaging with content online.";
-
-  const system = [
-    personaLine,
-    "Write a single comment replying to the social media post below.",
-    "Tone: " + toneDesc + ".",
-    "Rules:",
-    `  - Length: ${minChars} to ${maxChars} characters.`,
-    "  - Output ONLY the comment text. No labels, no quotes, no preamble.",
-    "  - Never start with 'Great post!' or hollow openers.",
-    "  - Be specific to the content.",
-    "  - Sound human, not AI-generated.",
-  ].join("\n");
-
-  const user = 'Post:\n"""\n' + postText.trim() + '\n"""\n\nWrite a comment:';
-
-  return [
-    { role: "system", content: system },
-    { role: "user", content: user },
-  ];
 }
 
 // ── Ollama Model List ─────────────────────────
@@ -411,6 +379,22 @@ function loadSettings() {
     chrome.storage.sync.get(DEFAULT_SETTINGS, resolve)
   );
 }
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command !== "generate-comment") return;
+
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => window.getSelection()?.toString().trim() ?? ""
+    }, ([result]) => {
+      const text = result?.result;
+      if (!text) return;
+      chrome.storage.session.set({ pendingGenerate: text });
+      chrome.sidePanel.open({ windowId: tab.windowId });
+    });
+  });
+});
 
 // ── Utility ───────────────────────────────────
 

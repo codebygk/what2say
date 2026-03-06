@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-//  Ollama Client — all network logic lives here.
+//  Ollama Client - all network logic lives here.
 //  The rest of the app never calls fetch() directly.
 // ─────────────────────────────────────────────
 import { OLLAMA } from "/src/shared/constants.js";

@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────
-//  Way2Say — License Validation Worker
-//  Cloudflare Worker — single file, zero deps
+//  ZapComment - License Validation Worker
+//  Cloudflare Worker - single file, zero deps
 //
 //  Routes:
 //    POST /validate        → check if a key is valid
@@ -16,7 +16,7 @@ export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "*";
 
-    // Handle preflight — Chrome extensions send OPTIONS before POST
+    // Handle preflight - Chrome extensions send OPTIONS before POST
     if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
@@ -42,7 +42,7 @@ export default {
       response = json({ error: "Internal server error" }, 500);
     }
 
-    // Attach CORS to every response — must clone since headers may be immutable
+    // Attach CORS to every response - must clone since headers may be immutable
     const corsResponse = new Response(response.body, response);
     corsResponse.headers.set("Access-Control-Allow-Origin", "*");
     corsResponse.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -112,22 +112,22 @@ async function handleWebhook(request, env) {
   const eventName = event?.meta?.event_name;
 
   // Handle the events we care about
-  console.log("[Way2Say] Webhook received:", eventName);
+  console.log("[ZapComment] Webhook received:", eventName);
 
   if      (eventName === "order_created")       await handleOrderCreated(event, env);
   else if (eventName === "license_key_created") await handleLicenseKeyCreated(event, env);
   else if (eventName === "license_key_updated") await handleLicenseUpdated(event, env);
-  else    console.log("[Way2Say] Unhandled event:", eventName);
+  else    console.log("[ZapComment] Unhandled event:", eventName);
 
   return json({ received: true });
 }
 
 async function handleOrderCreated(event, env) {
   // Log full payload so we can debug field paths in wrangler tail
-  console.log("[Way2Say] order_created payload:", JSON.stringify(event, null, 2));
+  console.log("[ZapComment] order_created payload:", JSON.stringify(event, null, 2));
 
   // Lemon Squeezy payload structure (as of 2024):
-  // order_created fires once per order — but does NOT include license keys.
+  // order_created fires once per order - but does NOT include license keys.
   // License keys come via the separate `license_key_created` event.
   // We handle both here defensively.
 
@@ -152,28 +152,28 @@ async function handleOrderCreated(event, env) {
       createdAt: Date.now(),
       expiresAt: null,
     });
-    console.log(`[Way2Say] License created (order_created) for ${email}: ${key}`);
+    console.log(`[ZapComment] License created (order_created) for ${email}: ${key}`);
   } else {
-    console.log("[Way2Say] No license key in order_created — waiting for license_key_created event");
+    console.log("[ZapComment] No license key in order_created - waiting for license_key_created event");
   }
 }
 
-// Handles the `license_key_created` event — fires separately from order_created
+// Handles the `license_key_created` event - fires separately from order_created
 async function handleLicenseKeyCreated(event, env) {
-  console.log("[Way2Say] license_key_created payload:", JSON.stringify(event, null, 2));
+  console.log("[ZapComment] license_key_created payload:", JSON.stringify(event, null, 2));
 
   // LS license_key_created payload structure:
-  // event.data.attributes.key         — the license key string
-  // event.data.attributes.status      — "active" | "inactive" etc
-  // event.data.attributes.order_id    — linked order
-  // event.meta.custom_data            — any custom data you passed at checkout
+  // event.data.attributes.key         - the license key string
+  // event.data.attributes.status      - "active" | "inactive" etc
+  // event.data.attributes.order_id    - linked order
+  // event.meta.custom_data            - any custom data you passed at checkout
   const key   = event?.data?.attributes?.key;
   const email = event?.meta?.custom_data?.email
              ?? event?.data?.attributes?.user_email
              ?? "unknown";
 
   if (!key) {
-    console.error("[Way2Say] No key in license_key_created payload");
+    console.error("[ZapComment] No key in license_key_created payload");
     return;
   }
 
@@ -187,7 +187,7 @@ async function handleLicenseKeyCreated(event, env) {
     expiresAt: null,
   });
 
-  console.log(`[Way2Say] License inserted (license_key_created): ${key}`);
+  console.log(`[ZapComment] License inserted (license_key_created): ${key}`);
 }
 
 async function handleLicenseUpdated(event, env) {

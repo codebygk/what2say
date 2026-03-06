@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "What2Say — AI Comment Generator for LinkedIn & X",
+  "name": "ZapComment - AI Comment Generator for LinkedIn & X",
   "version": "1.0.0",
   "description": "Generate AI-powered comments for LinkedIn and X using local Ollama models.",
 
@@ -43,5 +43,14 @@
     "16": "/icons/icon16.png",
     "48": "/icons/icon48.png",
     "128": "/icons/icon128.png"
+  },
+  "commands": {
+  "generate-comment": {
+    "suggested_key": {
+      "default": "Ctrl+Shift+E",
+      "mac": "Command+Shift+E"
+    },
+    "description": "Generate comment from selected text"
   }
+}
 }

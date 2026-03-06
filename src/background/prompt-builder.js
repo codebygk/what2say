@@ -1,45 +1,29 @@
-// ─────────────────────────────────────────────
-//  Prompt Builder — converts user settings +
-//  selected post text into an Ollama messages array.
-//  To add a new tone: just add it to TONES in constants.js.
-// ─────────────────────────────────────────────
-import { TONES } from "/src/shared/constants.js";
+import {
+  TONES,
+} from '../shared/constants.js';
 
-/**
- * Build the Ollama messages array for comment generation.
- *
- * @param {object} opts
- * @param {string} opts.postText  - Text selected by the user
- * @param {string} opts.tone      - Key from TONES map
- * @param {string} opts.persona   - Optional custom persona
- * @param {number} opts.charLimit - Max comment character length
- * @returns {{ role: string, content: string }[]}
- */
-export function buildCommentPrompt({ postText, tone, persona, charLimit }) {
-  const toneDescription = TONES[tone] ?? TONES.professional;
-
+export function buildPrompt({ postText, tone, persona, minChars, maxChars }) {
+  const toneDesc = TONES[tone] ?? TONES.professional;
   const personaLine =
     persona && persona.trim()
-      ? `You are writing as a person with a strong personality of: ${persona.trim()}.`
+      ? "You are writing with a strong personality of: " + persona.trim() + "."
       : "You are a thoughtful professional engaging with content online.";
 
-  const minChars = Math.max(50, charLimit - 100);
-
-  const systemLines = [
+  const system = [
     personaLine,
-    "Your task is to write a single comment replying to the social media post below.",
-    `Tone: ${toneDescription}.`,
+    "Write a single comment replying to the social media post below.",
+    "Tone: " + toneDesc + ".",
     "Rules:",
-    `  - Your response MUST be at least ${minChars} characters long.`,
-    `  - If your response is under ${minChars} characters, expand it before responding.`,
-    "  - Output ONLY the comment text. No labels, no quotes, no preamble.",
-    "  - Never start with 'Great post!' or similar hollow openers.",
-    "  - Be specific to the content — avoid vague generalities.",
+    `  - Length: ${minChars} to ${maxChars} characters.`,
+    "  - Do NOT wrap the comment in quotes (single or double).",
+    "  - Do NOT use code blocks, backticks, or markdown formatting.",
+    "  - Do NOT add any labels, headers, preamble or explanation.",
+    "  - Never start with 'Great post!' or hollow openers.",
+    "  - Be specific to the content of the post.",
     "  - Sound human, not AI-generated.",
-  ];
+  ].join("\n");
 
-  const system = systemLines.join("\n");
-  const user = ["Post:", '"""', postText.trim(), '"""', "", "Write a comment:"].join("\n");
+  const user = 'Post:\n"""\n' + postText.trim() + '\n"""\n\nWrite a comment:';
 
   return [
     { role: "system", content: system },
