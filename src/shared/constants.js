@@ -24,17 +24,20 @@ export const STORAGE_KEYS = {
 
 export const TONES = {
   professional: "professional and insightful",
-  friendly: "warm and friendly",
-  witty: "clever and witty",
-  concise: "brief and to the point",
+  clever: "clever and witty",
   supportive: "encouraging and supportive",
+  funny:        "humorous and light-hearted, use wit and playfulness",
 };
 
 export const DEFAULT_SETTINGS = {
-  model: "llama3:8b",
-  tone: "professional",
-  persona: "",
-  charLimit: 500,
+  provider:     "ollama",
+  model:        "llama3:8b",
+  apiKey:       "",
+  baseUrl:      "http://localhost:11434",
+  tone:         "professional",
+  persona:      "",
+  minCharLimit: 200,
+  maxCharLimit: 1000,
 };
 
 export const MESSAGES = {

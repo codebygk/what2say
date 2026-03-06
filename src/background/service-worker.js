@@ -16,25 +16,6 @@ const LICENSE_API =
   "https://way2say-license.gopalakrishnan-work-203.workers.dev";
 const PANEL_PATH = "src/sidepanel/sidepanel.html";
 
-const DEFAULT_SETTINGS = {
-  provider:     "ollama",
-  model:        "llama3:8b",
-  apiKey:       "",
-  baseUrl:      "http://localhost:11434",
-  tone:         "professional",
-  persona:      "",
-  minCharLimit: 200,
-  maxCharLimit: 1000,
-};
-
-const TONES = {
-  professional: "professional and insightful",
-  friendly:     "warm and friendly",
-  witty:        "clever and witty",
-  concise:      "brief and to the point",
-  supportive:   "encouraging and supportive",
-};
-
 // ── Provider Definitions ──────────────────────
 
 const PROVIDERS = {
@@ -182,7 +163,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === "GENERATE_IN_BG") {
-    handleGenerateRequest(message.text).then((result) => sendResponse(result));
+    handleGenerateRequest(message.text, message.quickTone, message.quickMin, message.quickMax)
+      .then((result) => sendResponse(result));
     return true;
   }
 });
@@ -238,15 +220,16 @@ async function callProvider(messages, settings) {
 
 // ── Generation ────────────────────────────────
 
-async function handleGenerateRequest(postText) {
+async function handleGenerateRequest(postText, quickTone = null, quickMin = null, quickMax = null) {
   chrome.action.setBadgeText({ text: "..." });
   chrome.action.setBadgeBackgroundColor({ color: "#4f6ef7" });
 
   const [settings, isPro] = await Promise.all([loadSettings(), checkLicense()]);
 
-  const tone     = isPro ? settings.tone        : FREE_TONE;
-  const minChars = isPro ? settings.minCharLimit : FREE_MIN_CHAR_LIMIT;
-  const maxChars = isPro ? settings.maxCharLimit : FREE_MAX_CHAR_LIMIT;
+  const tone     = isPro ? (quickTone ?? settings.tone) : FREE_TONE;
+  const minChars = isPro ? (quickMin  ?? settings.minCharLimit) : FREE_MIN_CHAR_LIMIT;
+  const maxChars = isPro ? (quickMax  ?? settings.maxCharLimit) : FREE_MAX_CHAR_LIMIT;
+  console.log(`[Way2Say] Generate — isPro:${isPro} tone:${tone} min:${minChars} max:${maxChars} (overrides: tone=${quickTone} min=${quickMin} max=${quickMax})`);
 
   const messages = buildPrompt({
     postText,
@@ -262,29 +245,11 @@ async function handleGenerateRequest(postText) {
     comment = await enforceCharLimits(comment, minChars, maxChars, messages, settings);
     console.log(`[Way2Say] Final comment length: ${comment.length}`);
     clearBadge();
-    await incrementUsage();
     return { ok: true, comment, provider: settings.provider, model: settings.model };
   } catch (err) {
     clearBadge();
     return { ok: false, error: err.message };
   }
-}
-
-async function incrementUsage() {
-  return new Promise((resolve) => {
-    const today = new Date().toISOString().slice(0, 10);
-    chrome.storage.local.get(
-      { usageCount: 0, usageToday: 0, usageDate: "" },
-      (data) => {
-        const todayCount = data.usageDate === today ? data.usageToday : 0;
-        chrome.storage.local.set({
-          usageCount: data.usageCount + 1,
-          usageToday: todayCount + 1,
-          usageDate:  today,
-        }, resolve);
-      }
-    );
-  });
 }
 
 // ── Char Limit Enforcement ────────────────────

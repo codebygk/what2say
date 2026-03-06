@@ -82,7 +82,13 @@ const errorMessage       = document.getElementById("errorMessage");
 const postPreview        = document.getElementById("postPreview");
 const postPreviewText    = document.getElementById("postPreviewText");
 const generatingProvider = document.getElementById("generatingProvider");
-const copyFeedback       = document.getElementById("copyFeedback");
+const quickControls      = document.getElementById("quickControls");
+const proSellStrip       = document.getElementById("proSellStrip");
+const qcTonePills        = document.getElementById("qcTonePills");
+const qcLengthPills      = document.getElementById("qcLengthPills");
+const qcCustomRow        = document.getElementById("qcCustomRow");
+const qcMinInput         = document.getElementById("qcMinInput");
+const qcMaxInput         = document.getElementById("qcMaxInput");
 
 // ── DOM — Settings tab ────────────────────────
 const tierBadge            = document.getElementById("tier-badge");
@@ -125,8 +131,6 @@ const personaInput         = document.getElementById("persona");
 const saveBtn              = document.getElementById("save-btn");
 const resetBtn             = document.getElementById("reset-btn");
 const saveConfirm          = document.getElementById("save-confirm");
-const statTotal         = document.getElementById("statTotal");
-const statToday        = document.getElementById("statToday");
 
 let isPro          = false;
 let activeProvider = "ollama";
@@ -141,6 +145,7 @@ async function init() {
   await populateForm();
   savedSnapshot = getFormState();
   watchForChanges();
+  initQuickControls();
   showGenerateState("idle");
 
   // Check if there's a pending generate from context menu (panel just opened)
@@ -191,7 +196,39 @@ async function startGenerate(text) {
   const settings = await loadSettings();
   generatingProvider.textContent = `${settings.provider} · ${settings.model}`;
 
-  chrome.runtime.sendMessage({ type: "GENERATE_IN_BG", text }, (result) => {
+  // Resolve tone — "default" means use settings value (pass null = service worker uses settings)
+  const activeTonePill = qcTonePills.querySelector(".qc-pill.active");
+  const toneOverride   = (activeTonePill?.dataset.tone !== "default")
+    ? activeTonePill?.dataset.tone ?? null
+    : null;
+
+  // Resolve length — "default" = null (service worker uses settings), "custom" = inputs
+  const activeLenPill = qcLengthPills.querySelector(".qc-pill.active");
+  const lenPreset     = activeLenPill?.dataset.preset ?? "default";
+  let minOverride = null, maxOverride = null;
+  if (lenPreset !== "default") {
+    if (lenPreset === "custom") {
+      const qMin = Number(qcMinInput.value);
+      const qMax = Number(qcMaxInput.value);
+      if (qMin > 0 && qMax > 0 && qMin < qMax) {
+        minOverride = qMin;
+        maxOverride = qMax;
+      }
+    } else {
+      minOverride = Number(activeLenPill.dataset.min);
+      maxOverride = Number(activeLenPill.dataset.max);
+    }
+  }
+
+  console.log(`[Way2Say] Quick overrides — tone: ${toneOverride}, min: ${minOverride}, max: ${maxOverride}`);
+
+  chrome.runtime.sendMessage({
+    type:      "GENERATE_IN_BG",
+    text,
+    quickTone: toneOverride,
+    quickMin:  minOverride,
+    quickMax:  maxOverride,
+  }, async (result) => {
     if (chrome.runtime.lastError) {
       errorMessage.textContent = chrome.runtime.lastError.message;
       showGenerateState("error");
@@ -202,12 +239,29 @@ async function startGenerate(text) {
       updateCharCount();
       showGenerateState("result");
       resultTextarea.focus();
-      updateStats(); // refresh stats bar after generation
+      // Auto-copy and update button text
+      copyBtn.textContent = "✓ Copied";
+      copyBtn.className   = "btn success";
+      await autoCopy(result.comment);
+      setTimeout(() => {
+        copyBtn.textContent = "📋 Copy";
+        copyBtn.className   = "btn primary";
+      }, 2500);
     } else {
       errorMessage.textContent = result?.error ?? "Unknown error occurred.";
       showGenerateState("error");
     }
   });
+}
+
+async function autoCopy(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Fallback — select + execCommand
+    resultTextarea.select();
+    document.execCommand("copy");
+  }
 }
 
 function showGenerateState(state) {
@@ -216,7 +270,6 @@ function showGenerateState(state) {
   stateError.style.display      = state === "error"      ? "flex"  : "none";
   stateResult.style.display     = state === "result"     ? "flex"  : "none";
   actionBar.style.display       = state === "result"     ? "flex"  : "none";
-  copyFeedback.style.display    = state === "result"     ? "block" : "none";
 }
 
 resultTextarea.addEventListener("input", updateCharCount);
@@ -226,43 +279,16 @@ function updateCharCount() {
   charCountEl.className   = len > 3000 ? "char-count over" : "char-count";
 }
 
-// ── Stats Bar ─────────────────────────────────
-async function updateStats() {
-  const today = new Date().toISOString().slice(0, 10);
-  const data  = await loadLocal({ usageCount: 0, usageToday: 0, usageDate: "" });
-
-  // Reset today counter if it's a new day
-  const todayCount = data.usageDate === today ? data.usageToday : 0;
-
-  statTotal.textContent = data.usageCount;
-  statToday.textContent = todayCount;
-
-  // Show pro/free badge in stats
-  const { licenseCache } = await loadLocal({ licenseCache: null });
-  const pro = licenseCache?.plan === "pro";
-  statProItem.style.display  = pro ? "flex" : "none";
-  statFreeItem.style.display = pro ? "none" : "flex";
-
-  // Show upsell strip only for free users when result is visible
-  proUpsellStrip.classList.toggle("visible");
-}
-
 copyBtn.addEventListener("click", async () => {
   const text = resultTextarea.value.trim();
   if (!text) return;
-  try {
-    await navigator.clipboard.writeText(text);
-    copyBtn.textContent      = "Copied!";
-    copyBtn.className        = "btn success";
-    setTimeout(() => {
-      copyBtn.textContent      = "Copy";
-      copyBtn.className        = "btn primary";
-    }, 2500);
-  } catch {
-    resultTextarea.select();
-    document.execCommand("copy");
-    setTimeout(() => { copyFeedback.textContent = ""; }, 2000);
-  }
+  copyBtn.textContent = "✓ Copied!";
+  copyBtn.className   = "btn success";
+  await autoCopy(text);
+  setTimeout(() => {
+    copyBtn.textContent = "📋 Copy";
+    copyBtn.className   = "btn primary";
+  }, 2500);
 });
 
 function triggerRegenerate() {
@@ -325,9 +351,9 @@ async function initProvider() {
   providerLabelEl.textContent = PROVIDER_CONFIG[activeProvider]?.label ?? activeProvider;
 
   timeoutSlider.value        = settings.timeoutSecs ?? 60;
-  timeoutDisplay.textContent = timeoutSlider.value + " s";
+  timeoutDisplay.textContent = timeoutSlider.value + "s";
   timeoutSlider.addEventListener("input", () => {
-    timeoutDisplay.textContent = timeoutSlider.value + " s";
+    timeoutDisplay.textContent = timeoutSlider.value + "s";
     updateSaveProviderBtn();
   });
 }
@@ -499,6 +525,7 @@ function applyTier(pro, key = "") {
   }
 
   personaInput.disabled = false;
+  applyQuickControlsTier(pro);
 }
 
 function maskKey(key) {
@@ -573,8 +600,69 @@ async function validateWithServer(key) {
 }
 
 // ════════════════════════════════════════════
-//  SETTINGS FORM
+//  QUICK CONTROLS (Generate tab)
 // ════════════════════════════════════════════
+
+function initQuickControls() {
+  // Tone pills — Default always resets to settings value
+  qcTonePills.querySelectorAll(".qc-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      if (pill.disabled) return;
+      qcTonePills.querySelectorAll(".qc-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+    });
+  });
+
+  // Length pills
+  qcLengthPills.querySelectorAll(".qc-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      if (pill.disabled) return;
+      qcLengthPills.querySelectorAll(".qc-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      // Show/hide custom inputs
+      const isCustom = pill.dataset.preset === "custom";
+      qcCustomRow.style.display = isCustom ? "flex" : "none";
+    });
+  });
+
+  // Custom length inputs — clamp on change
+  qcMinInput.addEventListener("input", () => {
+    let v = Number(qcMinInput.value);
+    if (v < 0) qcMinInput.value = 0;
+    if (v > 2000) qcMinInput.value = 2000;
+  });
+  qcMaxInput.addEventListener("input", () => {
+    let v = Number(qcMaxInput.value);
+    if (v < 0) qcMaxInput.value = 0;
+    if (v > 2000) qcMaxInput.value = 2000;
+  });
+}
+
+// Called on load and after settings save — resets both to Default
+function syncQuickControlsFromSettings() {
+  // Always reset to Default on load
+  qcTonePills.querySelectorAll(".qc-pill").forEach(p =>
+    p.classList.toggle("active", p.dataset.tone === "default")
+  );
+  qcLengthPills.querySelectorAll(".qc-pill").forEach(p =>
+    p.classList.toggle("active", p.dataset.preset === "default")
+  );
+  qcCustomRow.style.display = "none";
+}
+
+function applyQuickControlsTier(pro) {
+  // Free: disable all non-default pills
+  qcTonePills.querySelectorAll(".qc-pill").forEach(p => {
+    p.disabled = !pro && p.dataset.tone !== "default";
+  });
+  qcLengthPills.querySelectorAll(".qc-pill").forEach(p => {
+    p.disabled = !pro && p.dataset.preset !== "default";
+  });
+  // Lock custom inputs for free
+  qcMinInput.disabled = !pro;
+  qcMaxInput.disabled = !pro;
+  proSellStrip.style.display = pro ? "none" : "block";
+}
 
 // ── Char limit badge + custom input logic ─────
 
@@ -714,6 +802,7 @@ async function populateForm() {
   minCharInput.value = minVal;
   maxCharInput.value = maxVal;
   syncBadgeToValues(minVal, maxVal);
+  syncQuickControlsFromSettings();
 
   personaInput.value = s.persona ?? "";
 }
@@ -724,6 +813,7 @@ function getFormState() {
     minCharLimit: clamp(Number(minCharInput.value), 0, 2000),
     maxCharLimit: clamp(Number(maxCharInput.value), 0, 2000),
     persona:      personaInput.value.trim(),
+    timeoutSecs:  Number(timeoutSlider.value),
   };
 }
 
@@ -734,7 +824,8 @@ function hasChanges() {
     c.tone         !== savedSnapshot.tone         ||
     c.minCharLimit !== savedSnapshot.minCharLimit ||
     c.maxCharLimit !== savedSnapshot.maxCharLimit ||
-    c.persona      !== savedSnapshot.persona
+    c.persona      !== savedSnapshot.persona      ||
+    c.timeoutSecs  !== savedSnapshot.timeoutSecs
   );
 }
 
@@ -746,6 +837,7 @@ function updateSaveBtn() {
 function watchForChanges() {
   toneSelect.addEventListener("change", updateSaveBtn);
   personaInput.addEventListener("input", updateSaveBtn);
+  timeoutSlider.addEventListener("input", updateSaveBtn);
   initCharBadges();
 }
 
@@ -755,6 +847,7 @@ saveBtn.addEventListener("click", async () => {
   savedSnapshot    = state;
   saveBtn.disabled = true;
   showSaveConfirm("Settings saved ✓");
+  syncQuickControlsFromSettings();
 });
 
 resetBtn.addEventListener("click", async () => {
@@ -783,4 +876,4 @@ function showSaveConfirm(msg) {
 }
 
 // ── Boot ──────────────────────────────────────
-init().then(updateStats);
+init();

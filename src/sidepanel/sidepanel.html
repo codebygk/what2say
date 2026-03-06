@@ -264,66 +264,6 @@
       background: var(--bg-secondary);
       border-top: 1px solid var(--border);
     }
-    
-    /* ── STATS BAR ── */
-    .stats-bar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 14px;
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      gap: 8px;
-    }
-    .stat-item {
-      display: flex; flex-direction: column; align-items: center; gap: 1px;
-      flex: 1;
-    }
-    .stat-item + .stat-item { border-left: 1px solid var(--border); }
-    .stat-val {
-      font-family: var(--mono); font-size: 15px; font-weight: 700;
-      color: var(--accent); line-height: 1;
-    }
-    .stat-label {
-      font-size: 9px; font-weight: 600; color: var(--text-secondary);
-      text-transform: uppercase; letter-spacing: 0.4px;
-    }
-
-    /* ── PRO UPSELL STRIP (below textarea, free only) ── */
-    .pro-upsell-strip {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 9px 14px;
-      background: var(--bg-secondary);
-      border-top: 1px solid var(--border);
-      /* display: none; */
-      align-items: flex-start;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-    .pro-upsell-strip.visible { display: flex; }
-    .pro-upsell-text { flex: 1; }
-    .pro-upsell-title {
-      font-size: 11px; font-weight: 700;
-      color: var(--text-primary); margin-bottom: 8px;
-    }
-    .pro-upsell-features {
-      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px;
-    }
-    .upsell-tag {
-      font-size: 9px; font-weight: 600;
-      padding: 2px 6px; border-radius: 3px;
-      background: var(--accent-subtle);
-      color: var(--accent);
-      border: 1px solid rgba(79,110,247,0.2);
-    }
-    .pro-upsell-btn {
-      padding: 5px 10px; border-radius: var(--radius-sm);
-      background: var(--accent); color: #fff; border: none;
-      font-family: var(--sans); font-size: 11px; font-weight: 700;
-      cursor: pointer; white-space: nowrap; flex-shrink: 0;
-      transition: opacity 0.15s; align-self: center;
-      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
-    }
-    .pro-upsell-btn:hover { opacity: 0.85; }
 
     .copy-feedback {
       text-align: center; font-size: 11px; font-weight: 600;
@@ -413,7 +353,6 @@
     .field-row { display: flex; flex-direction: column; gap: 4px; }
     .field-label {
       font-size: 10px; font-weight: 600;
-      margin: 0 20px;
       color: var(--text-secondary);
       text-transform: uppercase; letter-spacing: 0.5px;
     }
@@ -581,7 +520,7 @@
     .upgrade-hint { font-size: 10px; color: var(--warning); font-weight: 600; }
 
     .char-limit-row { display: flex; flex-direction: column; gap: 4px; }
-    .char-limit-header { display: flex; align-items: center; justify-content: end; }
+    .char-limit-header { display: flex; align-items: center; justify-content: space-between; }
     .char-limit-label {
       font-size: 10px; font-weight: 600; color: var(--text-secondary);
       text-transform: uppercase; letter-spacing: 0.5px;
@@ -660,6 +599,68 @@
 
     #save-confirm { text-align: center; font-size: 11px; font-weight: 500; color: var(--success); min-height: 15px; padding: 3px 14px 5px; background: var(--bg-secondary); }
 
+    /* ── QUICK CONTROLS ── */
+    .quick-controls {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+    .quick-controls-inner {
+      padding: 8px 12px;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    .qc-group { display: flex; align-items: center; gap: 8px; }
+    .qc-label {
+      font-size: 9px; font-weight: 700; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      flex-shrink: 0; width: 36px;
+    }
+    .qc-pills { display: flex; gap: 4px; flex-wrap: wrap; }
+    .qc-pill {
+      padding: 3px 9px; border-radius: 20px;
+      border: 1px solid var(--border); background: var(--bg-card);
+      color: var(--text-secondary);
+      font-size: 10px; font-weight: 600; cursor: pointer;
+      font-family: var(--sans);
+      transition: all 0.12s; white-space: nowrap;
+    }
+    .qc-pill:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+    .qc-pill.active { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
+    .qc-pill.qc-custom-len.active { border-color: var(--success); color: var(--success); background: var(--success-subtle); }
+    .qc-pill:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .qc-custom-row {
+      display: flex; align-items: center; gap: 8px;
+      padding-top: 2px;
+    }
+    .qc-custom-inputs {
+      display: flex; align-items: center; gap: 6px; flex: 1;
+    }
+    .qc-custom-inputs input[type="number"] {
+      width: 64px; padding: 4px 7px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--bg-input); color: var(--text-primary);
+      font-family: var(--mono); font-size: 11px; font-weight: 600;
+      outline: none; text-align: center;
+      -moz-appearance: textfield;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .qc-custom-inputs input[type="number"]::-webkit-outer-spin-button,
+    .qc-custom-inputs input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .qc-custom-inputs input[type="number"]:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-subtle); }
+    .qc-custom-sep  { color: var(--text-secondary); font-size: 12px; }
+    .qc-custom-chars { font-size: 10px; color: var(--text-secondary); font-weight: 600; }
+
+    .pro-sell-strip {
+      padding: 6px 12px;
+      font-size: 10px; color: var(--warning);
+      background: var(--warning-subtle);
+      border-top: 1px solid var(--warning-border);
+      line-height: 1.5;
+    }
+    .pro-sell-strip strong { font-weight: 700; }
+    .pro-sell-strip a { color: var(--warning); font-weight: 700; text-decoration: underline; }
+
     /* Footer */
     .app-footer {
       padding: 7px 14px; font-size: 10px; color: var(--text-secondary);
@@ -704,25 +705,6 @@
 
   <!-- ═══ GENERATE TAB ═══ -->
   <div class="tab-panel active" id="tab-generate">
-    <!-- Stats bar — always visible in generate tab -->
-    <div class="stats-bar" id="statsBar">
-      <div class="stat-item">
-        <span class="stat-val" id="statTotal">0</span>
-        <span class="stat-label">Total</span>
-      </div>
-      <div class="stat-item">
-        <span class="stat-val" id="statToday">0</span>
-        <span class="stat-label">Today</span>
-      </div>
-      <div class="stat-item" id="statProItem" style="display:none;">
-        <span class="stat-val" style="color:var(--success);">Pro</span>
-        <span class="stat-label">Plan</span>
-      </div>
-      <div class="stat-item" id="statFreeItem">
-        <span class="stat-val" style="color:var(--warning);">Free</span>
-        <span class="stat-label">Plan</span>
-      </div>
-    </div>
 
     <div class="state-idle" id="stateIdle">
       <div class="idle-icon">✍️</div>
@@ -753,11 +735,10 @@
     </div>
 
     <div class="state-result" id="stateResult">
-            <div class="post-preview" id="postPreview" style="display:none;">
+      <div class="post-preview" id="postPreview" style="display:none;">
         <div class="post-preview-label">Replying to</div>
         <div class="post-preview-text" id="postPreviewText"></div>
       </div>
-      
       <div class="result-meta">
         <div class="result-ready">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -766,27 +747,53 @@
         <span class="char-count" id="charCount">0 chars</span>
       </div>
       <textarea class="result-textarea" id="resultTextarea" spellcheck="true" placeholder="Your comment will appear here…"></textarea>
-    <!-- Pro upsell strip — shown below textarea for free users -->
-     <div class="pro-upsell-strip" id="proUpsellStrip">
-        <div class="pro-upsell-text">
-          <div class="pro-upsell-title">✨ Upgrade once. Better comments forever.</div>
-          <div class="pro-upsell-features">
-            <span class="upsell-tag">2000 chars</span>
-            <span class="upsell-tag">5 tones</span>
-            <span class="upsell-tag">Lifetime access</span>
-            <span class="upsell-tag">Future updates</span>
+    <!-- Pro sell strip — hidden for pro users -->
+      <div class="pro-sell-strip" id="proSellStrip">
+        🔒 <strong>Pro</strong> unlocks custom lengths &amp; tones ·
+        <a href="https://YOUR_STORE_URL" target="_blank" rel="noopener">Upgrade $4.99 →</a>
+      </div>
+    <!-- Quick controls: tone + char limit (always visible on generate tab) -->
+    <div class="quick-controls" id="quickControls">
+      <div class="quick-controls-inner">
+        <div class="qc-group">
+          <span class="qc-label">Tone</span>
+          <div class="qc-pills" id="qcTonePills">
+            <button class="qc-pill active" data-tone="default">Default</button>
+            <button class="qc-pill" data-tone="professional">Professional</button>
+            <button class="qc-pill" data-tone="clever">Clever</button>
+            <button class="qc-pill" data-tone="supportive">Supportive</button>
+            <button class="qc-pill" data-tone="funny">Funny</button>
           </div>
         </div>
-        <a class="pro-upsell-btn" id="proUpsellBtn" href="https://qacancode.lemonsqueezy.com/checkout/buy/43b47d7c-2415-455e-8720-825b0b17b534" target="_blank" rel="noopener">$4.99 →</a>
+        <div class="qc-group">
+          <span class="qc-label">Length</span>
+          <div class="qc-pills" id="qcLengthPills">
+            <button class="qc-pill active" data-preset="default">Default</button>
+            <button class="qc-pill" data-preset="micro"  data-min="50"  data-max="150">Micro</button>
+            <button class="qc-pill" data-preset="short"  data-min="100" data-max="300">Short</button>
+            <button class="qc-pill" data-preset="medium" data-min="200" data-max="500">Medium</button>
+            <button class="qc-pill" data-preset="long"   data-min="400" data-max="800">Long</button>
+            <button class="qc-pill qc-custom-len" data-preset="custom">Custom</button>
+          </div>
+        </div>
+        <!-- Custom length inputs — shown only when Custom is active -->
+        <div class="qc-custom-row" id="qcCustomRow" style="display:none;">
+          <span class="qc-label">Range</span>
+          <div class="qc-custom-inputs">
+            <input type="number" id="qcMinInput" min="0" max="2000" step="10" placeholder="Min" />
+            <span class="qc-custom-sep">—</span>
+            <input type="number" id="qcMaxInput" min="0" max="2000" step="10" placeholder="Max" />
+            <span class="qc-custom-chars">chars</span>
+          </div>
+        </div>
       </div>
     </div>
+    </div>
       
-
     <div class="action-bar" id="actionBar">
       <button class="btn" id="regenerateBtn">Regenerate</button>
       <button class="btn primary" id="copyBtn">Copy</button>
     </div>
-    <div class="copy-feedback" id="copyFeedback" style="display:none;"></div>
 
   </div><!-- /tab-generate -->
 
@@ -819,7 +826,7 @@
               <button id="license-activate-btn">Activate</button>
             </div>
             <div class="license-error" id="license-error"></div>
-            <p class="license-hint">No license? <a href="https://qacancode.lemonsqueezy.com/checkout/buy/43b47d7c-2415-455e-8720-825b0b17b534" target="_blank" rel="noopener">Activate Pro →</a></p>
+            <p class="license-hint">No license? <a href="https://YOUR_STORE_URL" target="_blank" rel="noopener">Get Pro for $4.99 →</a></p>
           </div>
           <div id="pro-state" style="display:none;">
             <div class="pro-active-row">
@@ -881,11 +888,10 @@
             <span id="tone-lock" style="font-size:10px;color:var(--warning);display:none;">🔒 Pro</span>
           </label>
           <select id="tone-select">
-            <option value="professional">Professional &amp; Insightful</option>
-            <option value="friendly">Warm &amp; Friendly</option>
-            <option value="witty">Clever &amp; Witty</option>
-            <option value="concise">Brief &amp; Concise</option>
-            <option value="supportive">Encouraging &amp; Supportive</option>
+            <option value="professional">Professional</option>
+            <option value="clever">Clever</option>
+            <option value="supportive">Supportive</option>
+            <option value="funny">Funny</option>
           </select>
         </div>
 
@@ -934,7 +940,6 @@
           <!-- Free fixed display -->
           <div class="char-fixed" id="char-fixed-row" style="display:none;">
             <span>100 - 300 characters (Free limit)</span>
-            <span class="upgrade-hint">⬆ Upgrade</span>
           </div>
         </div>
 
@@ -943,7 +948,8 @@
           <label>Request Timeout</label>
           <div class="char-limit-row">
             <div class="char-limit-header">
-              <span class="char-limit-val" id="timeout-display">60 s</span>
+              <span class="char-limit-label">Seconds</span>
+              <span class="char-limit-val" id="timeout-display">60s</span>
             </div>
             <input type="range" class="char-slider" id="timeout-slider" min="10" max="120" step="5" value="60" />
           </div>
