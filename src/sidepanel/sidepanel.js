@@ -212,10 +212,19 @@ function showGenerateState(state) {
 }
 
 resultTextarea.addEventListener("input", updateCharCount);
-function updateCharCount() {
+async function updateCharCount() {
   const len = resultTextarea.value.length;
-  charCountEl.textContent = `${len} char${len !== 1 ? "s" : ""}`;
-  charCountEl.className   = len > 3000 ? "char-count over" : "char-count";
+  const s   = await loadSettings();
+  const max = isPro ? (s.maxCharLimit ?? 3000) : 300;
+
+  // Clamp to max
+  if (len > max) {
+    resultTextarea.value = resultTextarea.value.slice(0, max);
+  }
+
+  const clamped = Math.min(len, max);
+  charCountEl.textContent = `${clamped} / ${max}`;
+  charCountEl.className   = clamped >= max ? "char-count over" : "char-count";
 }
 
 copyBtn.addEventListener("click", async () => {
@@ -410,7 +419,7 @@ saveProviderBtn.addEventListener("click", async () => {
   setTimeout(() => {
     providerStatus.textContent = "";
     providerStatus.className   = "provider-status";
-  }, 2000);
+  }, 3000);
 });
 
 // ════════════════════════════════════════════
@@ -562,12 +571,12 @@ function initQuickControls() {
   qcMinInput.addEventListener("input", () => {
     let v = Number(qcMinInput.value);
     if (v < 0) qcMinInput.value = 0;
-    if (v > 2000) qcMinInput.value = 2000;
+    if (v > 3000) qcMinInput.value = 3000;
   });
   qcMaxInput.addEventListener("input", () => {
     let v = Number(qcMaxInput.value);
     if (v < 0) qcMaxInput.value = 0;
-    if (v > 2000) qcMaxInput.value = 2000;
+    if (v > 3000) qcMaxInput.value = 3000;
   });
 }
 
@@ -665,8 +674,8 @@ function validateCharInputs() {
     minCharBox.classList.add("error");
     return false;
   }
-  if (max > 2000) {
-    charValidation.textContent = "Max cannot exceed 2000.";
+  if (max > 3000) {
+    charValidation.textContent = "Max cannot exceed 3000.";
     maxCharBox.classList.add("error");
     return false;
   }
@@ -689,28 +698,28 @@ function initCharBadges() {
   });
 
   document.getElementById("min-up").addEventListener("click", () => {
-    minCharInput.value = clamp(Number(minCharInput.value) + 10, 0, 2000);
+    minCharInput.value = clamp(Number(minCharInput.value) + 10, 0, 3000);
     onCustomCharChange();
   });
   document.getElementById("min-down").addEventListener("click", () => {
-    minCharInput.value = clamp(Number(minCharInput.value) - 10, 0, 2000);
+    minCharInput.value = clamp(Number(minCharInput.value) - 10, 0, 3000);
     onCustomCharChange();
   });
   document.getElementById("max-up").addEventListener("click", () => {
-    maxCharInput.value = clamp(Number(maxCharInput.value) + 10, 0, 2000);
+    maxCharInput.value = clamp(Number(maxCharInput.value) + 10, 0, 3000);
     onCustomCharChange();
   });
   document.getElementById("max-down").addEventListener("click", () => {
-    maxCharInput.value = clamp(Number(maxCharInput.value) - 10, 0, 2000);
+    maxCharInput.value = clamp(Number(maxCharInput.value) - 10, 0, 3000);
     onCustomCharChange();
   });
 
   minCharInput.addEventListener("input", () => {
-    minCharInput.value = clamp(Number(minCharInput.value), 0, 2000);
+    minCharInput.value = clamp(Number(minCharInput.value), 0, 3000);
     onCustomCharChange();
   });
   maxCharInput.addEventListener("input", () => {
-    maxCharInput.value = clamp(Number(maxCharInput.value), 0, 2000);
+    maxCharInput.value = clamp(Number(maxCharInput.value), 0, 3000);
     onCustomCharChange();
   });
 }
@@ -737,8 +746,8 @@ async function populateForm() {
 function getFormState() {
   return {
     tone:         toneSelect.value,
-    minCharLimit: clamp(Number(minCharInput.value), 0, 2000),
-    maxCharLimit: clamp(Number(maxCharInput.value), 0, 2000),
+    minCharLimit: clamp(Number(minCharInput.value), 0, 3000),
+    maxCharLimit: clamp(Number(maxCharInput.value), 0, 3000),
     persona:      personaInput.value.trim(),
     timeoutSecs:  Number(timeoutSlider.value),
   };
