@@ -51,7 +51,7 @@ export const NOTIFICATIONS = {
   ICON: "/icons/icon48.png",
 };
 
-export const LICENSE_API = "https://zapcomment-license.gopalakrishnan-work-203.workers.dev/";
+export const LICENSE_API = "https://zapcomment-license.gopalakrishnan-work-203.workers.dev";
 export const PRO_PLAN_URL = "https://dodo.pe/zapcomment";
 export const CACHE_DAYS = 7;
 

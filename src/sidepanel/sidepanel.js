@@ -11,6 +11,9 @@ const resetSettings = ()   => saveSettings(DEFAULT_SETTINGS);
 const loadLocal = defaults => new Promise(r => chrome.storage.local.get(defaults, r));
 const saveLocal = data     => new Promise(r => chrome.storage.local.set(data, r));
 
+const LICENSE_API = "https://zapcomment-license.gopalakrishnan-work-203.workers.dev";
+const CACHE_DAYS  = 7;
+
 // ── DOM - Generate tab ────────────────────────
 const stateIdle          = document.getElementById("stateIdle");
 const stateGenerating    = document.getElementById("stateGenerating");
@@ -92,7 +95,6 @@ async function init() {
   initQuickControls();
   showGenerateState("idle");
 
-  // Check if there's a pending generate from context menu (panel just opened)
   chrome.storage.session.get(["pendingGenerate"], ({ pendingGenerate }) => {
     if (pendingGenerate) {
       chrome.storage.session.remove("pendingGenerate");
@@ -101,7 +103,6 @@ async function init() {
   });
 }
 
-// Listen for pending generate when panel is already open
 chrome.storage.session.onChanged.addListener((changes) => {
   if (changes.pendingGenerate?.newValue) {
     const text = changes.pendingGenerate.newValue;
@@ -140,13 +141,11 @@ async function startGenerate(text) {
   const settings = await loadSettings();
   generatingProvider.textContent = `${settings.provider} · ${settings.model}`;
 
-  // Resolve tone - "default" means use settings value (pass null = service worker uses settings)
   const activeTonePill = qcTonePills.querySelector(".qc-pill.active");
   const toneOverride   = (activeTonePill?.dataset.tone !== "default")
     ? activeTonePill?.dataset.tone ?? null
     : null;
 
-  // Resolve length - "default" = null (service worker uses settings), "custom" = inputs
   const activeLenPill = qcLengthPills.querySelector(".qc-pill.active");
   const lenPreset     = activeLenPill?.dataset.preset ?? "default";
   let minOverride = null, maxOverride = null;
@@ -163,8 +162,6 @@ async function startGenerate(text) {
       maxOverride = Number(activeLenPill.dataset.max);
     }
   }
-
-  console.log(`[ZapComment] Quick overrides - tone: ${toneOverride}, min: ${minOverride}, max: ${maxOverride}`);
 
   chrome.runtime.sendMessage({
     type:      "GENERATE_IN_BG",
@@ -183,7 +180,6 @@ async function startGenerate(text) {
       updateCharCount();
       showGenerateState("result");
       resultTextarea.focus();
-      // Auto-copy and update button text
       copyBtn.textContent = "Copied";
       copyBtn.className   = "btn success";
       await autoCopy(result.comment);
@@ -202,7 +198,6 @@ async function autoCopy(text) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    // Fallback - select + execCommand
     resultTextarea.select();
     document.execCommand("copy");
   }
@@ -463,7 +458,6 @@ function applyTier(pro, key = "") {
     setCharInputsLocked(true);
   } else {
     document.querySelectorAll(".char-badge").forEach(b => b.disabled = false);
-    // restore locked state based on current mode
     setCharInputsLocked(!isCustomMode);
   }
 
@@ -534,7 +528,7 @@ async function validateWithServer(key) {
   try {
     const res = await fetch(`${LICENSE_API}/validate`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, deviceId }),
+      body: JSON.stringify({ key: key.trim().toUpperCase(), deviceId }),
     });
     return await res.json();
   } catch {
@@ -547,7 +541,6 @@ async function validateWithServer(key) {
 // ════════════════════════════════════════════
 
 function initQuickControls() {
-  // Tone pills - Default always resets to settings value
   qcTonePills.querySelectorAll(".qc-pill").forEach(pill => {
     pill.addEventListener("click", () => {
       if (pill.disabled) return;
@@ -556,19 +549,16 @@ function initQuickControls() {
     });
   });
 
-  // Length pills
   qcLengthPills.querySelectorAll(".qc-pill").forEach(pill => {
     pill.addEventListener("click", () => {
       if (pill.disabled) return;
       qcLengthPills.querySelectorAll(".qc-pill").forEach(p => p.classList.remove("active"));
       pill.classList.add("active");
-      // Show/hide custom inputs
       const isCustom = pill.dataset.preset === "custom";
       qcCustomRow.style.display = isCustom ? "flex" : "none";
     });
   });
 
-  // Custom length inputs - clamp on change
   qcMinInput.addEventListener("input", () => {
     let v = Number(qcMinInput.value);
     if (v < 0) qcMinInput.value = 0;
@@ -581,9 +571,7 @@ function initQuickControls() {
   });
 }
 
-// Called on load and after settings save - resets both to Default
 function syncQuickControlsFromSettings() {
-  // Always reset to Default on load
   qcTonePills.querySelectorAll(".qc-pill").forEach(p =>
     p.classList.toggle("active", p.dataset.tone === "default")
   );
@@ -594,17 +582,15 @@ function syncQuickControlsFromSettings() {
 }
 
 function applyQuickControlsTier(pro) {
-  // Free: disable all non-default pills
   qcTonePills.querySelectorAll(".qc-pill").forEach(p => {
     p.disabled = !pro && p.dataset.tone !== "default";
   });
   qcLengthPills.querySelectorAll(".qc-pill").forEach(p => {
     p.disabled = !pro && p.dataset.preset !== "default";
   });
-  // Lock custom inputs for free
   qcMinInput.disabled = !pro;
   qcMaxInput.disabled = !pro;
-  proSellStrip.style.display = pro ? "none" : "block";
+  proSellStrip.style.display = pro ? "none" : "flex";
 }
 
 // ── Char limit badge + custom input logic ─────
@@ -702,7 +688,6 @@ function initCharBadges() {
     });
   });
 
-  // Steppers
   document.getElementById("min-up").addEventListener("click", () => {
     minCharInput.value = clamp(Number(minCharInput.value) + 10, 0, 2000);
     onCustomCharChange();
@@ -720,7 +705,6 @@ function initCharBadges() {
     onCustomCharChange();
   });
 
-  // Direct typing
   minCharInput.addEventListener("input", () => {
     minCharInput.value = clamp(Number(minCharInput.value), 0, 2000);
     onCustomCharChange();

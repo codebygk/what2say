@@ -4,13 +4,17 @@
 # ─────────────────────────────────────────────
 
 name = "zapcomment-license"
-main = "src/index.js"
-compatibility_date = "2026-03-04"
+main = "index.js"
+compatibility_date = "2026-03-07"
 
 # KV namespace - stores all license data
 # After creating with `npx wrangler kv:namespace create LICENSES`
 # paste the id below
 [[kv_namespaces]]
 binding = "LICENSES"
-id = "1eafeb1097344d4a9b87d91cacd6b2ed"
+id = "b276f688c0024c60b80d545d287701b0"
 
+# Secrets — set via CLI, never in wrangler.toml
+# After deploying, run:
+#   npx wrangler secret put DODO_WEBHOOK_SECRET
+# Paste the Webhook Signing Key from Dodo Payments Dashboard → Developer → Webhooks

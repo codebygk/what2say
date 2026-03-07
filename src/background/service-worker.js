@@ -251,14 +251,12 @@ async function handleGenerateRequest(postText, quickTone = null, quickMin = null
 }
 
 // ── Char Limit Enforcement ────────────────────
-// Rule: code enforces max unconditionally. Model is never trusted for length.
 
 function trimToMax(text, maxChars) {
   if (text.length <= maxChars) return text;
 
   const slice = text.slice(0, maxChars);
 
-  // Try sentence boundary (must be in the latter 60% to be worth using)
   const sentenceEnd = Math.max(
     slice.lastIndexOf(". "),
     slice.lastIndexOf("! "),
@@ -267,34 +265,27 @@ function trimToMax(text, maxChars) {
   );
   if (sentenceEnd > maxChars * 0.6) {
     const cut = text.slice(0, sentenceEnd + 1).trim();
-    // Only use if trim didn't somehow push over (trim never adds chars, but be safe)
     if (cut.length <= maxChars) return cut;
   }
 
-  // Word boundary
   const wordEnd = slice.lastIndexOf(" ");
   if (wordEnd > maxChars * 0.6) {
     const cut = text.slice(0, wordEnd).trim();
     if (cut.length <= maxChars) return cut;
   }
 
-  // Hard cut - guaranteed
   return text.slice(0, maxChars);
 }
 
 async function enforceCharLimits(comment, minChars, maxChars, messages, settings, attempt = 1) {
   const MAX_ATTEMPTS = 3;
 
-  // STEP 1: Hard trim to max - always, unconditionally
   if (comment.length > maxChars) {
     comment = trimToMax(comment, maxChars);
-    // Safety net: if still over (shouldn't happen), force slice
     if (comment.length > maxChars) comment = comment.slice(0, maxChars);
   }
 
-  // STEP 2: If under min, retry with model
   if (comment.length < minChars && attempt <= MAX_ATTEMPTS) {
-    console.log(`[ZapComment] Under min (${comment.length}/${minChars}), retry ${attempt}`);
     const retryMessages = [
       ...messages,
       { role: "assistant", content: comment },
@@ -305,8 +296,6 @@ async function enforceCharLimits(comment, minChars, maxChars, messages, settings
     ];
     try {
       let expanded = await callProvider(retryMessages, settings);
-      console.log(`[ZapComment] Retry ${attempt} returned ${expanded.length} chars`);
-      // Trim retry result before recursing
       if (expanded.length > maxChars) {
         expanded = trimToMax(expanded, maxChars);
         if (expanded.length > maxChars) expanded = expanded.slice(0, maxChars);
@@ -317,10 +306,7 @@ async function enforceCharLimits(comment, minChars, maxChars, messages, settings
     }
   }
 
-  // STEP 3: Final guaranteed clamp - runs no matter what
   if (comment.length > maxChars) comment = comment.slice(0, maxChars);
-
-  console.log(`[ZapComment] enforceCharLimits done: ${comment.length} chars (limit ${minChars}-${maxChars})`);
   return comment;
 }
 
